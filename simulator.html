@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SoilCheck — Simulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background:#1a1a2e; color:#e0e0e0; }
+    .card { background:#16213e; border:1px solid #0f3460; border-radius:14px; padding:1.25rem; box-shadow:0 4px 20px rgba(0,0,0,0.4); }
+    input[type=range] { -webkit-appearance:none; width:100%; height:6px; border-radius:3px; background:#0f3460; outline:none; cursor:pointer; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:#00d4aa; cursor:pointer; box-shadow:0 0 8px #00d4aa; }
+    .btn-primary { background:linear-gradient(135deg,#00d4aa,#0099cc); color:#fff; font-weight:700; border:none; border-radius:10px; padding:.6rem 1.2rem; cursor:pointer; transition:opacity .2s,transform .1s; width:100%; }
+    .btn-primary:hover{opacity:.9} .btn-primary:active{transform:scale(.97)} .btn-primary:disabled{opacity:.4;cursor:not-allowed}
+    .btn-danger { background:linear-gradient(135deg,#e53935,#b71c1c); color:#fff; font-weight:700; border:none; border-radius:10px; padding:.6rem 1.2rem; cursor:pointer; transition:opacity .2s; width:100%; }
+    .btn-danger:hover{opacity:.9}
+    .badge { font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; padding:3px 10px; border-radius:999px; border:1px solid; display:inline-block; }
+    .badge-ok   { border-color:#00d4aa; color:#00d4aa; background:rgba(0,212,170,.1); }
+    .badge-err  { border-color:#e53935; color:#e53935; background:rgba(229,57,53,.1); }
+    .badge-wait { border-color:#888;    color:#888;    background:rgba(255,255,255,.05); }
+    #log-terminal { background:#0d0d1a; border:1px solid #0f3460; border-radius:10px; height:160px; overflow-y:auto; padding:.75rem; font-size:.72rem; font-family:'Courier New',monospace; color:#00d4aa; }
+    #log-terminal .err{color:#ff6b6b} #log-terminal .info{color:#aaa} #log-terminal .ok{color:#00d4aa}
+    #log-terminal::-webkit-scrollbar{width:4px} #log-terminal::-webkit-scrollbar-track{background:#0d0d1a} #log-terminal::-webkit-scrollbar-thumb{background:#0f3460;border-radius:2px}
+    .divider{border:none;border-top:1px solid #0f3460;margin:1rem 0}
+    .val-display{font-size:1.6rem;font-weight:800;background:linear-gradient(135deg,#00d4aa,#0099cc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    .sw-track{width:44px;height:24px;border-radius:999px;background:#0f3460;position:relative;cursor:pointer;transition:background .3s;flex-shrink:0;border:1px solid #1a4080;}
+    .sw-track.on{background:rgba(0,212,170,.25);border-color:#00d4aa}
+    .sw-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#444;transition:transform .3s,background .3s;}
+    .sw-track.on .sw-thumb{transform:translateX(20px);background:#00d4aa}
+    @keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(0,212,170,.5)}70%{box-shadow:0 0 0 10px rgba(0,212,170,0)}100%{box-shadow:0 0 0 0 rgba(0,212,170,0)}}
+    .pulsing{animation:pulse-ring 1.5s infinite;border-radius:10px}
+  </style>
+</head>
+<body class="min-h-screen">
+  <div class="max-w-md mx-auto px-4 py-6 flex flex-col gap-5 relative overflow-hidden">
+
+    <!-- HEADER -->
+    <div class="flex items-center justify-between border-b border-[#0f3460] pb-4">
+      <div class="flex items-center gap-3">
+        <button id="menu-btn" aria-label="Menu" class="flex flex-col gap-1 p-2 focus:outline-none transition-transform active:scale-95 hover:bg-[#0f3460] rounded-lg">
+          <span class="block w-5 h-0.5 bg-[#00d4aa]"></span>
+          <span class="block w-5 h-0.5 bg-[#00d4aa]"></span>
+          <span class="block w-5 h-0.5 bg-[#00d4aa]"></span>
+        </button>
+        <div>
+          <h1 class="text-lg font-extrabold tracking-wider" style="color:#00d4aa;">🧪 SOILCHECK</h1>
+          <p class="text-[10px]" style="color:#666;">ESP32 Simulator — Firebase</p>
+        </div>
+      </div>
+      <span id="conn-badge" class="badge badge-wait">Connecting…</span>
+    </div>
+
+    <!-- WRITE COUNTER -->
+    <div class="card flex items-center justify-between gap-3">
+      <div>
+        <p class="text-xs font-bold mb-0.5" style="color:#00d4aa;">Firebase RTDB</p>
+        <p class="text-xs" style="color:#555;">psti-b376f-default-rtdb</p>
+      </div>
+      <div class="text-right">
+        <p id="write-count" class="val-display text-base">0</p>
+        <p class="text-xs" style="color:#555;">writes</p>
+      </div>
+    </div>
+
+    <!-- SLIDER MANUAL -->
+    <div class="card flex flex-col gap-4">
+      <p class="text-xs font-bold tracking-widest uppercase" style="color:#00d4aa;">✍️ Input Manual</p>
+
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-sm font-semibold">pH Tanah</label>
+          <span id="disp-ph" class="val-display">7.0</span>
+        </div>
+        <input type="range" id="sl-ph" min="3" max="10" step="0.1" value="7.0"
+          oninput="document.getElementById('disp-ph').textContent=parseFloat(this.value).toFixed(1)">
+        <div class="flex justify-between text-xs mt-1" style="color:#555;"><span>3 (Asam)</span><span>7 (Netral)</span><span>10 (Basa)</span></div>
+      </div>
+
+      <hr class="divider">
+
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-sm font-semibold">NPK</label>
+          <span id="disp-npk" class="val-display">50</span>
+        </div>
+        <input type="range" id="sl-npk" min="0" max="100" step="1" value="50"
+          oninput="document.getElementById('disp-npk').textContent=this.value">
+        <div class="flex justify-between text-xs mt-1" style="color:#555;"><span>0 (Rendah)</span><span>50 (Medium)</span><span>100 (Tinggi)</span></div>
+      </div>
+
+      <hr class="divider">
+
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-sm font-semibold">Fertility Score</label>
+          <span id="disp-fs" class="val-display">80</span>
+        </div>
+        <input type="range" id="sl-fs" min="0" max="100" step="1" value="80"
+          oninput="document.getElementById('disp-fs').textContent=this.value">
+        <div class="flex justify-between text-xs mt-1" style="color:#555;"><span>0 (Buruk)</span><span>50 (Cukup)</span><span>100 (Subur)</span></div>
+      </div>
+
+      <hr class="divider">
+
+      <div>
+        <label class="text-sm font-semibold block mb-1">Teks Rekomendasi</label>
+        <input type="text" id="inp-kondisi" value="Kondisi tanah optimal. Pertahankan pemupukan."
+          class="w-full rounded-lg px-3 py-2 text-sm outline-none"
+          style="background:#0d0d1a;border:1px solid #0f3460;color:#e0e0e0;">
+      </div>
+
+      <button class="btn-primary" id="btn-send" onclick="kirimManual()">📤 Kirim ke Firebase Sekarang</button>
+    </div>
+
+    <!-- AUTO SIMULATOR -->
+    <div class="card flex flex-col gap-3">
+      <p class="text-xs font-bold tracking-widest uppercase" style="color:#00d4aa;">🤖 Auto Simulator (seperti ESP32)</p>
+      <p class="text-xs" style="color:#666;">Kirim data acak realistis ke Firebase otomatis setiap beberapa detik.</p>
+
+      <div class="flex items-center gap-3">
+        <label class="text-sm flex-1">Interval kirim:</label>
+        <select id="sel-interval" class="rounded-lg px-3 py-1.5 text-sm outline-none flex-1"
+          style="background:#0d0d1a;border:1px solid #0f3460;color:#e0e0e0;">
+          <option value="2000">2 detik</option>
+          <option value="5000" selected>5 detik</option>
+          <option value="10000">10 detik</option>
+          <option value="30000">30 detik</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <label class="text-sm flex-1">Skenario:</label>
+        <select id="sel-skenario" class="rounded-lg px-3 py-1.5 text-sm outline-none flex-1"
+          style="background:#0d0d1a;border:1px solid #0f3460;color:#e0e0e0;">
+          <option value="optimal">🟢 Tanah Optimal</option>
+          <option value="asam">🟡 Tanah Asam</option>
+          <option value="miskin">🔴 Tanah Miskin NPK</option>
+          <option value="random">🎲 Acak Total</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <label class="text-sm flex-1">Simpan ke Log (grafik):</label>
+        <div class="sw-track on" id="sw-log" onclick="toggleLogSwitch()"><div class="sw-thumb"></div></div>
+      </div>
+
+      <div class="flex gap-2">
+        <button class="btn-primary" id="btn-start" onclick="startSim()">▶ Mulai Simulasi</button>
+        <button class="btn-danger"  id="btn-stop"  onclick="stopSim()" style="display:none;">■ Stop</button>
+      </div>
+      <div id="sim-status" class="text-center text-xs" style="color:#555;display:none;">
+        Kirim berikutnya: <span id="countdown" class="font-bold" style="color:#00d4aa;">–</span>
+      </div>
+    </div>
+
+    <!-- LOG TERMINAL -->
+    <div class="card flex flex-col gap-2">
+      <div class="flex items-center justify-between">
+        <p class="text-xs font-bold tracking-widest uppercase" style="color:#00d4aa;">📟 Activity Log</p>
+        <button onclick="clearLog()" class="text-xs px-3 py-1 rounded-lg" style="background:#0f3460;color:#aaa;">Clear</button>
+      </div>
+      <div id="log-terminal"><span class="info">[ SoilCheck Simulator siap. ]</span><br></div>
+    </div>
+
+    <a href="index.html" target="_blank" class="text-center block py-3 rounded-xl font-bold text-white"
+       style="background:linear-gradient(135deg,#3a2d1e,#5a4030);text-decoration:none;">
+      🌿 Buka Dashboard SoilCheck →
+    </a>
+
+    <!-- SLIDE-OUT NAVIGATION DRAWER -->
+    <!-- Backdrop -->
+    <div id="drawer-backdrop" class="absolute inset-0 bg-black/60 opacity-0 pointer-events-none transition-opacity duration-300 z-40"></div>
+    
+    <!-- Drawer Content -->
+    <div id="drawer-content" class="absolute top-0 bottom-0 left-0 w-64 bg-[#16213e] shadow-2xl z-50 transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col border-r border-[#0f3460]">
+      <!-- Drawer Header -->
+      <div style="background:#1a1a2e;" class="flex items-center justify-between px-4 py-4 border-b border-[#0f3460]">
+        <h2 class="font-extrabold tracking-widest text-sm text-[#00d4aa]">SOILCHECK MENU</h2>
+        <button id="close-menu-btn" class="text-gray-400 hover:text-white p-1 focus:outline-none transition-transform active:scale-90" aria-label="Close menu">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="flex flex-col py-4 px-3 gap-2 flex-1">
+        <a href="index.html" class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#aaa] hover:text-white hover:bg-[#0f3460] font-medium transition-all duration-200">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+          </svg>
+          <span class="text-sm">Dashboard</span>
+        </a>
+        
+        <a href="simulator.html" class="flex items-center gap-3 px-4 py-3 rounded-lg text-white bg-[#0f3460] font-bold transition-all duration-200 shadow-sm border border-[#1a4080]">
+          <svg class="w-5 h-5" fill="none" stroke="#00d4aa" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+          </svg>
+          <span class="text-sm">ESP32 Simulator</span>
+        </a>
+      </nav>
+
+      <!-- Drawer Footer -->
+      <div class="p-4 border-t border-[#0f3460] text-center">
+        <p class="text-[10px] text-gray-500 font-semibold tracking-wider uppercase">SoilCheck Mobile v1.1</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK via CDN — menggunakan compat (v8 style) agar lebih mudah debug -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <script>
+    /* ── 1. KONFIGURASI FIREBASE (lengkap dari console) ── */
+    const firebaseConfig = {
+      apiKey:            "AIzaSyDdOxTgyrdXH9xwC7bU7fDMYIoTD3qzxvg",
+      authDomain:        "psti-b376f.firebaseapp.com",
+      projectId:         "psti-b376f",
+      storageBucket:     "psti-b376f.firebasestorage.app",
+      messagingSenderId: "658575197616",
+      appId:             "1:658575197616:web:da2d5e9032eee01465c275",
+      measurementId:     "G-EXEQT9RYD9",
+      databaseURL:       "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    /* ── 2. INISIALISASI ── */
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    /* ── 3. STATE ── */
+    let simTimer   = null;
+    let cdTimer    = null;
+    let cdRemain   = 0;
+    let writeCount = 0;
+    let logEnabled = true;
+
+    /* ── 4. CEK KONEKSI ── */
+    db.ref('.info/connected').on('value', snap => {
+      const ok    = snap.val();
+      const badge = document.getElementById('conn-badge');
+      badge.className   = 'badge ' + (ok ? 'badge-ok' : 'badge-err');
+      badge.textContent = ok ? '● Connected' : '● Offline';
+      addLog(ok ? 'Firebase terhubung ✓' : 'Firebase terputus!', ok ? 'ok' : 'err');
+    });
+
+    /* ── 5. KIRIM DATA (meniru ESP32) ── */
+    async function kirimData(ph, npk, fertilityScore, kondisi) {
+      try {
+        const label = fs2label(fertilityScore);
+
+        // Tulis sensor secara paralel (lebih cepat)
+        await Promise.all([
+          db.ref('soilcheck/sensors/ph').set(ph),
+          db.ref('soilcheck/sensors/npk').set(npk),
+          db.ref('soilcheck/status/fertility_score').set(fertilityScore),
+          db.ref('soilcheck/status/fertility_label').set(label),
+          db.ref('soilcheck/status/kondisi').set(kondisi)
+        ]);
+
+        // Tulis ke log (untuk grafik tren) jika aktif
+        if (logEnabled) {
+          await db.ref('soilcheck/log').push({
+            ph:        ph,
+            npk:       npk,
+            timestamp: Date.now()
+          });
+        }
+
+        writeCount++;
+        document.getElementById('write-count').textContent = writeCount;
+        addLog(`✓ pH=${ph.toFixed(1)} | NPK=${npk} | FS=${fertilityScore}% (${label})`, 'ok');
+      } catch (err) {
+        addLog('✗ Gagal: ' + err.message, 'err');
+      }
+    }
+
+    /* ── 6. HELPER ── */
+    function fs2label(s) { return s >= 80 ? 'Tinggi' : s >= 50 ? 'Cukup' : 'Rendah'; }
+    function rnd(a, b, d=1) { return parseFloat((Math.random()*(b-a)+a).toFixed(d)); }
+
+    /* ── 7. SKENARIO DATA ── */
+    function generateData(sk) {
+      switch(sk) {
+        case 'optimal': return { ph:rnd(6.2,7.0), npk:rnd(55,90,0), fs:rnd(80,98,0), k:'Kondisi tanah optimal. Pertahankan pemupukan.' };
+        case 'asam':    return { ph:rnd(3.5,5.4), npk:rnd(20,55,0), fs:rnd(30,60,0), k:'pH terlalu rendah. Tambahkan kapur dolomit.' };
+        case 'miskin':  return { ph:rnd(6.0,7.2), npk:rnd(0,28,0),  fs:rnd(15,45,0), k:'NPK sangat rendah. Segera tambahkan pupuk NPK.' };
+        default:        return { ph:rnd(3.5,9.5), npk:rnd(0,100,0), fs:rnd(0,100,0), k:'Data simulasi acak.' };
+      }
+    }
+
+    /* ── 8. KIRIM MANUAL ── */
+    window.kirimManual = async function() {
+      const btn = document.getElementById('btn-send');
+      btn.disabled = true; btn.textContent = '⏳ Mengirim…';
+      await kirimData(
+        parseFloat(document.getElementById('sl-ph').value),
+        parseInt(document.getElementById('sl-npk').value),
+        parseInt(document.getElementById('sl-fs').value),
+        document.getElementById('inp-kondisi').value || 'Kondisi tanah optimal.'
+      );
+      btn.disabled = false; btn.textContent = '📤 Kirim ke Firebase Sekarang';
+    };
+
+    /* ── 9. AUTO SIM ── */
+    window.startSim = function() {
+      const interval = parseInt(document.getElementById('sel-interval').value);
+      const d = generateData(document.getElementById('sel-skenario').value);
+      kirimData(d.ph, d.npk, d.fs, d.k);
+      addLog(`Auto-sim mulai | skenario: ${document.getElementById('sel-skenario').value} | ${interval/1000}s`, 'info');
+
+      cdRemain = interval / 1000;
+      clearInterval(cdTimer);
+      cdTimer = setInterval(() => {
+        cdRemain--;
+        if (cdRemain <= 0) cdRemain = parseInt(document.getElementById('sel-interval').value)/1000;
+        document.getElementById('countdown').textContent = cdRemain + 's';
+      }, 1000);
+
+      simTimer = setInterval(() => {
+        const d2 = generateData(document.getElementById('sel-skenario').value);
+        kirimData(d2.ph, d2.npk, d2.fs, d2.k);
+      }, interval);
+
+      document.getElementById('btn-start').style.display = 'none';
+      document.getElementById('btn-stop').style.display  = 'block';
+      document.getElementById('sim-status').style.display = 'block';
+      document.getElementById('countdown').textContent   = cdRemain + 's';
+    };
+
+    window.stopSim = function() {
+      clearInterval(simTimer); clearInterval(cdTimer); simTimer = null;
+      document.getElementById('btn-start').style.display  = 'block';
+      document.getElementById('btn-stop').style.display   = 'none';
+      document.getElementById('sim-status').style.display = 'none';
+      addLog('Auto-sim dihentikan.', 'info');
+    };
+
+    window.toggleLogSwitch = function() {
+      logEnabled = !logEnabled;
+      const sw = document.getElementById('sw-log');
+      logEnabled ? sw.classList.add('on') : sw.classList.remove('on');
+      addLog('Log grafik: ' + (logEnabled ? 'AKTIF' : 'NONAKTIF'), 'info');
+    };
+
+    /* ── 10. TERMINAL LOG ── */
+    function addLog(msg, type='ok') {
+      const el  = document.getElementById('log-terminal');
+      const now = new Date().toLocaleTimeString('id-ID',{hour12:false});
+      el.innerHTML += `<span class="${type}">[${now}] ${msg}</span><br>`;
+      el.scrollTop  = el.scrollHeight;
+    }
+    window.clearLog = () => {
+      document.getElementById('log-terminal').innerHTML = '<span class="info">[ Log dikosongkan. ]</span><br>';
+    };
+
+    /* ── 11. KONTROL DRAWER (Hamburger Menu) ── */
+    const menuBtn = document.getElementById('menu-btn');
+    const closeMenuBtn = document.getElementById('close-menu-btn');
+    const drawerBackdrop = document.getElementById('drawer-backdrop');
+    const drawerContent = document.getElementById('drawer-content');
+
+    function openDrawer() {
+      drawerBackdrop.classList.remove('pointer-events-none', 'opacity-0');
+      drawerBackdrop.classList.add('opacity-100');
+      drawerContent.classList.remove('-translate-x-full');
+    }
+
+    function closeDrawer() {
+      drawerBackdrop.classList.remove('opacity-100');
+      drawerBackdrop.classList.add('pointer-events-none', 'opacity-0');
+      drawerContent.classList.add('-translate-x-full');
+    }
+
+    menuBtn.addEventListener('click', openDrawer);
+    closeMenuBtn.addEventListener('click', closeDrawer);
+    drawerBackdrop.addEventListener('click', closeDrawer);
+  </script>
+</body>
+</html>
