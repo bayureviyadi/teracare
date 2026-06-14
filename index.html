@@ -144,6 +144,15 @@
         font-size: 0.8rem;
         color: #95a5a6;
       }
+      .status-tanah {
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 10px;
+        background: #f4f9f8;
+        color: #1f4037;
+        font-weight: 600;
+        font-size: 0.95rem;
+      }
     </style>
   </head>
   <body>
@@ -176,6 +185,8 @@
         </div>
       </div>
 
+      <div class="status-tanah" id="statusTanahText">-</div>
+
       <div class="updated" id="lastUpdate">Belum ada data</div>
     </div>
 
@@ -200,7 +211,7 @@
       let lastLogTime = 0;
 
       // Simpan satu entri log ke /logs
-      function simpanLog(persen, adc, ip) {
+      function simpanLog(persen, adc, ip, kondisi) {
         const now = Date.now();
         if (now - lastLogTime < LOG_INTERVAL_MS) return;
         lastLogTime = now;
@@ -211,6 +222,7 @@
           kesuburan: persen,
           adc: adc,
           ip: ip || "-",
+          kondisi: kondisi || "-",
         });
       }
 
@@ -237,12 +249,23 @@
         document.getElementById("persenValue").textContent = persen + "%";
         document.getElementById("adcValue").textContent = adc;
 
+        // Menentukan kondisi tanah berdasarkan nilai ADC
+        let kondisiTanah = "Normal";
+        if (adc < 1000) {
+          kondisiTanah = "Sangat Kering (Gersang)";
+        } else if (adc >= 1000 && adc <= 2500) {
+          kondisiTanah = "Lembap (Sangat Ideal)";
+        } else {
+          kondisiTanah = "Terlalu Basah / Jenuh Air";
+        }
+        document.getElementById("statusTanahText").textContent = kondisiTanah;
+
         const now = new Date();
         document.getElementById("lastUpdate").textContent =
           "Update terakhir: " + now.toLocaleTimeString("id-ID");
 
         // Catat ke log secara berkala
-        simpanLog(persen, adc, ipTerakhir);
+        simpanLog(persen, adc, ipTerakhir, kondisiTanah);
       });
 
       // Listener status koneksi wifi ESP32
