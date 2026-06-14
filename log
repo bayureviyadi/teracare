@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Log Data Kesuburan Tanah</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Segoe UI", sans-serif;
+      }
+      body {
+        background: linear-gradient(135deg, #1f4037, #99f2c8);
+        min-height: 100vh;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 20px;
+      }
+      .card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 30px;
+        max-width: 500px;
+        width: 100%;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        margin-top: 20px;
+      }
+      h1 {
+        color: #1f4037;
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+      }
+
+      /* Navigasi Tab */
+      .nav {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        background: #f4f9f8;
+        border-radius: 12px;
+        padding: 6px;
+      }
+      .nav a {
+        flex: 1;
+        text-decoration: none;
+        padding: 10px;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #1f4037;
+        transition: background 0.2s ease, color 0.2s ease;
+      }
+      .nav a.active {
+        background: #1f4037;
+        color: #fff;
+      }
+      .nav a:not(.active):hover {
+        background: #e2efe9;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+      .toolbar button {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+      }
+      .btn-refresh {
+        background: #1f4037;
+        color: #fff;
+      }
+      .btn-clear {
+        background: #fde2e2;
+        color: #c0392b;
+      }
+      .toolbar button:hover {
+        opacity: 0.85;
+      }
+
+      .table-wrap {
+        max-height: 420px;
+        overflow-y: auto;
+        border-radius: 12px;
+        border: 1px solid #e2efe9;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      }
+      thead th {
+        background: #1f4037;
+        color: #fff;
+        padding: 10px;
+        position: sticky;
+        top: 0;
+        text-align: left;
+      }
+      tbody td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #f0f0f0;
+        color: #34495e;
+        text-align: left;
+      }
+      tbody tr:nth-child(even) {
+        background: #f9fcfb;
+      }
+      .empty {
+        padding: 30px;
+        color: #95a5a6;
+        font-size: 0.9rem;
+      }
+      .status-text {
+        margin-top: 12px;
+        font-size: 0.8rem;
+        color: #95a5a6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>📋 Log Data Kesuburan Tanah</h1>
+
+      <nav class="nav">
+        <a href="index.html">Monitoring</a>
+        <a href="log.html" class="active">Log Data</a>
+      </nav>
+
+      <div class="toolbar">
+        <button class="btn-refresh" onclick="muatUlang()">🔄 Refresh</button>
+        <button class="btn-clear" onclick="hapusSemua()">🗑️ Hapus Semua</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Kesuburan (%)</th>
+              <th>ADC</th>
+              <th>IP ESP32</th>
+            </tr>
+          </thead>
+          <tbody id="logBody">
+            <tr>
+              <td colspan="4" class="empty">Memuat data...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="status-text" id="statusText">Menunggu data...</div>
+    </div>
+
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyDdOxTgyrdXH9xwC7bU7fDMYIoTD3qzxvg",
+        authDomain: "psti-b376f.firebaseapp.com",
+        databaseURL:
+          "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "psti-b376f",
+        storageBucket: "psti-b376f.firebasestorage.app",
+        messagingSenderId: "658575197616",
+        appId: "1:658575197616:web:da2d5e9032eee01465c275",
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
+      const logBody = document.getElementById("logBody");
+      const statusText = document.getElementById("statusText");
+
+      function renderLogs(data) {
+        if (!data) {
+          logBody.innerHTML =
+            '<tr><td colspan="4" class="empty">Belum ada data log</td></tr>';
+          statusText.textContent = "Belum ada data log";
+          return;
+        }
+
+        // Ubah object menjadi array, urutkan dari terbaru ke terlama
+        const entries = Object.values(data).sort(
+          (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
+        );
+
+        logBody.innerHTML = entries
+          .map(
+            (item) => `
+              <tr>
+                <td>${item.waktu || "-"}</td>
+                <td>${item.kesuburan !== undefined ? item.kesuburan + "%" : "-"}</td>
+                <td>${item.adc !== undefined ? item.adc : "-"}</td>
+                <td>${item.ip || "-"}</td>
+              </tr>
+            `
+          )
+          .join("");
+
+        statusText.textContent = `Total ${entries.length} catatan`;
+      }
+
+      // Listener realtime data log
+      db.ref("/logs").on("value", (snapshot) => {
+        renderLogs(snapshot.val());
+      });
+
+      function muatUlang() {
+        statusText.textContent = "Memuat ulang...";
+        db.ref("/logs")
+          .get()
+          .then((snapshot) => renderLogs(snapshot.val()));
+      }
+
+      function hapusSemua() {
+        if (!confirm("Hapus semua data log? Tindakan ini tidak bisa dibatalkan.")) {
+          return;
+        }
+        db.ref("/logs")
+          .remove()
+          .then(() => {
+            statusText.textContent = "Semua log telah dihapus";
+          });
+      }
+    </script>
+  </body>
+</html>
