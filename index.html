@@ -35,6 +35,34 @@
         font-size: 1.5rem;
         margin-bottom: 20px;
       }
+
+      /* Navigasi Tab */
+      .nav {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        background: #f4f9f8;
+        border-radius: 12px;
+        padding: 6px;
+      }
+      .nav a {
+        flex: 1;
+        text-decoration: none;
+        padding: 10px;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #1f4037;
+        transition: background 0.2s ease, color 0.2s ease;
+      }
+      .nav a.active {
+        background: #1f4037;
+        color: #fff;
+      }
+      .nav a:not(.active):hover {
+        background: #e2efe9;
+      }
+
       .status {
         display: inline-flex;
         align-items: center;
@@ -122,6 +150,11 @@
     <div class="card">
       <h1>🌱 Monitoring Kesuburan Tanah</h1>
 
+      <nav class="nav">
+        <a href="index.html" class="active">Monitoring</a>
+        <a href="log.html">Log Data</a>
+      </nav>
+
       <div id="wifiStatus" class="status offline">
         <span class="dot"></span>
         <span id="wifiText">Memeriksa koneksi...</span>
@@ -162,11 +195,31 @@
       firebase.initializeApp(firebaseConfig);
       const db = firebase.database();
 
+      // Interval minimum antar pencatatan log (ms) agar database tidak penuh
+      const LOG_INTERVAL_MS = 5 * 60 * 1000; // 5 menit
+      let lastLogTime = 0;
+
+      // Simpan satu entri log ke /logs
+      function simpanLog(persen, adc, ip) {
+        const now = Date.now();
+        if (now - lastLogTime < LOG_INTERVAL_MS) return;
+        lastLogTime = now;
+
+        db.ref("/logs").push({
+          timestamp: now,
+          waktu: new Date(now).toLocaleString("id-ID"),
+          kesuburan: persen,
+          adc: adc,
+          ip: ip || "-",
+        });
+      }
+
+      let ipTerakhir = "-";
+
       // Listener data sensor
       db.ref("/sensor").on("value", (snapshot) => {
         const data = snapshot.val();
 
-        // Trik Debugging: Cetak data asli Firebase ke Console Browser (Tekan F12 di web untuk melihat)
         console.log("Data Sensor dari Firebase:", data);
 
         if (!data) {
@@ -175,21 +228,21 @@
           return;
         }
 
-        // Mengonversi data ke tipe Number secara paksa agar grafik conic-gradient tidak error
         const persen = Number(data.kesuburan) || 0;
         const adc = data.adc !== undefined ? data.adc : "-";
 
-        // Update grafik dan angka ke UI web
         document
           .getElementById("gauge")
           .style.setProperty("--persen", persen + "%");
         document.getElementById("persenValue").textContent = persen + "%";
         document.getElementById("adcValue").textContent = adc;
 
-        // Menampilkan update waktu real-time beserta detiknya
         const now = new Date();
         document.getElementById("lastUpdate").textContent =
           "Update terakhir: " + now.toLocaleTimeString("id-ID");
+
+        // Catat ke log secara berkala
+        simpanLog(persen, adc, ipTerakhir);
       });
 
       // Listener status koneksi wifi ESP32
@@ -208,10 +261,12 @@
           wifiStatus.className = "status online";
           wifiText.textContent = "ESP32 Terhubung";
           ipValue.textContent = status.ip_address || "-";
+          ipTerakhir = status.ip_address || "-";
         } else {
           wifiStatus.className = "status offline";
           wifiText.textContent = "ESP32 Offline";
           ipValue.textContent = "-";
+          ipTerakhir = "-";
         }
       });
     </script>
