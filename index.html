@@ -1,353 +1,219 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SoilCheck</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { font-family:'Segoe UI',system-ui,sans-serif; background:#f0ece8; }
-    .gauge-label{font-size:.82rem;margin-top:6px;text-align:center;font-weight:600}
-    .chart-container{background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px 12px 10px;overflow:hidden}
-    @keyframes subtle-pulse{0%,100%{opacity:1}50%{opacity:.85}}
-    .status-banner{animation:subtle-pulse 3s ease-in-out infinite}
-    .badge{font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:999px;border:1px solid;display:inline-block}
-    .badge-ok  {border-color:#43a047;color:#43a047;background:rgba(67,160,71,.08)}
-    .badge-err {border-color:#e53935;color:#e53935;background:rgba(229,57,53,.08)}
-    .badge-wait{border-color:#aaa;   color:#aaa;   background:rgba(0,0,0,.04)}
-  </style>
-</head>
-<body class="min-h-screen">
-  <div class="max-w-sm mx-auto bg-white min-h-screen shadow-xl flex flex-col relative overflow-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Monitoring Kesuburan Tanah</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Segoe UI", sans-serif;
+      }
+      body {
+        background: linear-gradient(135deg, #1f4037, #99f2c8);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 30px;
+        max-width: 400px;
+        width: 100%;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        text-align: center;
+      }
+      h1 {
+        color: #1f4037;
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 16px;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 25px;
+      }
+      .status.online {
+        background: #d4f8e8;
+        color: #1f8a4c;
+      }
+      .status.offline {
+        background: #fde2e2;
+        color: #c0392b;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .gauge {
+        width: 200px;
+        height: 200px;
+        margin: 0 auto 20px;
+        border-radius: 50%;
+        background: conic-gradient(
+          #27ae60 0% var(--persen, 0%),
+          #ecf0f1 var(--persen, 0%) 100%
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        transition: background 0.5s ease;
+      }
+      .gauge::before {
+        content: "";
+        position: absolute;
+        width: 160px;
+        height: 160px;
+        background: #fff;
+        border-radius: 50%;
+      }
+      .gauge-value {
+        position: relative;
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #1f4037;
+      }
+      .gauge-label {
+        position: absolute;
+        bottom: 55px;
+        font-size: 0.85rem;
+        color: #7f8c8d;
+      }
+      .info {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+        padding: 15px;
+        background: #f4f9f8;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        color: #34495e;
+      }
+      .info div span {
+        display: block;
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #1f4037;
+        margin-top: 4px;
+      }
+      .updated {
+        margin-top: 15px;
+        font-size: 0.8rem;
+        color: #95a5a6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>🌱 Monitoring Kesuburan Tanah</h1>
 
-    <!-- HEADER -->
-    <header style="background:#4a3728;" class="flex items-center justify-between px-4 py-3 z-10">
-      <div class="flex items-center gap-3">
-        <button id="menu-btn" aria-label="Menu" class="flex flex-col gap-1 p-1 focus:outline-none transition-transform active:scale-95">
-          <span class="block w-5 h-0.5 bg-white"></span>
-          <span class="block w-5 h-0.5 bg-white"></span>
-          <span class="block w-5 h-0.5 bg-white"></span>
-        </button>
-        <h1 class="text-white font-bold text-lg tracking-widest">SOILCHECK</h1>
+      <div id="wifiStatus" class="status offline">
+        <span class="dot"></span>
+        <span id="wifiText">Memeriksa koneksi...</span>
       </div>
-      <span id="conn-badge" class="badge badge-wait">Connecting…</span>
-    </header>
 
-    <main class="flex-1 px-4 py-4 flex flex-col gap-5">
-
-      <div class="flex items-baseline justify-between">
-        <h2 class="text-xl font-bold" style="color:#3a2d1e;">Dashboard</h2>
-        <span id="last-update" class="text-xs" style="color:#aaa;">–</span>
+      <div class="gauge" id="gauge" style="--persen: 0%">
+        <div class="gauge-value" id="persenValue">0%</div>
+        <div class="gauge-label">Estimasi Kesuburan</div>
       </div>
 
-      <!-- DUA GAUGE -->
-      <div class="flex justify-around items-start">
-        <div class="flex flex-col items-center">
-          <canvas id="gauge-ph" width="140" height="90"></canvas>
-          <p id="label-ph" class="gauge-label" style="color:#2e7d32;">pH: – (–)</p>
+      <div class="info">
+        <div>
+          ADC Raw
+          <span id="adcValue">-</span>
         </div>
-        <div class="flex flex-col items-center">
-          <canvas id="gauge-npk" width="140" height="90"></canvas>
-          <p id="label-npk" class="gauge-label" style="color:#558b2f;">NPK (–)</p>
+        <div>
+          IP ESP32
+          <span id="ipValue">-</span>
         </div>
       </div>
 
-      <!-- FERTILITY SCORE -->
-      <div class="rounded-lg px-4 py-3" style="background:#f1f8e9;border:1px solid #c5e1a5;">
-        <p class="text-sm font-semibold" style="color:#33691e;">
-          Fertility Score:
-          <span id="fertility-label" style="color:#2e7d32;">–</span>
-          <span id="fertility-pct"   style="color:#1b5e20;font-weight:700;"> (–)</span>
-        </p>
-      </div>
-
-      <!-- LOG DATA CHART -->
-      <div>
-        <h3 class="font-bold text-sm mb-2" style="color:#3a2d1e;">Log Data</h3>
-        <div class="chart-container"><canvas id="chart-log" height="110"></canvas></div>
-        <p class="text-xs mt-1" style="color:#bbb;">Tren pH (10 pembacaan terakhir)</p>
-      </div>
-
-      <!-- REKOMENDASI -->
-      <div class="rounded-lg px-4 py-3" style="background:#fafafa;border:1px solid #e0e0e0;">
-        <h3 class="font-bold text-sm mb-1" style="color:#3a2d1e;">Recommendato:</h3>
-        <p id="rekomendasi" class="text-sm" style="color:#4e6b3a;">Memuat rekomendasi…</p>
-      </div>
-
-      <!-- STATUS -->
-      <div class="pb-4">
-        <h3 class="font-bold text-sm mb-2" style="color:#3a2d1e;">Status:</h3>
-        <div id="status-banner" class="status-banner rounded-lg px-4 py-3 text-center" style="background:#9e9e9e;">
-          <p id="status-text" class="font-extrabold text-white tracking-wide text-base">Memuat data…</p>
-        </div>
-      </div>
-
-    </main>
-
-    <!-- SLIDE-OUT NAVIGATION DRAWER -->
-    <!-- Backdrop -->
-    <div id="drawer-backdrop" class="absolute inset-0 bg-black/40 opacity-0 pointer-events-none transition-opacity duration-300 z-40"></div>
-    
-    <!-- Drawer Content -->
-    <div id="drawer-content" class="absolute top-0 bottom-0 left-0 w-64 bg-[#fcfbfa] shadow-2xl z-50 transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col border-r border-[#e8e4e0]">
-      <!-- Drawer Header -->
-      <div style="background:#4a3728;" class="flex items-center justify-between px-4 py-4">
-        <h2 class="text-white font-extrabold tracking-widest text-sm">SOILCHECK MENU</h2>
-        <button id="close-menu-btn" class="text-white hover:text-gray-300 p-1 focus:outline-none transition-transform active:scale-90" aria-label="Close menu">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Navigation Links -->
-      <nav class="flex flex-col py-4 px-3 gap-2 flex-1">
-        <a href="index.html" class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#4a3728] bg-[#f0ece8] font-bold transition-all duration-200 shadow-sm border border-[#e0dad5]">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-          </svg>
-          <span class="text-sm">Dashboard</span>
-        </a>
-        
-        <a href="simulator.html" class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#5a483a] hover:text-[#00d4aa] hover:bg-[#eafaf6] font-medium transition-all duration-200">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-          </svg>
-          <span class="text-sm">ESP32 Simulator</span>
-        </a>
-      </nav>
-
-      <!-- Drawer Footer -->
-      <div class="p-4 border-t border-[#e8e4e0] text-center">
-        <p class="text-[10px] text-gray-400 font-semibold tracking-wider uppercase">SoilCheck Mobile v1.1</p>
-      </div>
+      <div class="updated" id="lastUpdate">Belum ada data</div>
     </div>
-  </div>
 
-  <!-- Firebase SDK compat (lebih andal di browser tanpa bundler) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <script>
+      // Konfigurasi Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyDdOxTgyrdXH9xwC7bU7fDMYIoTD3qzxvg",
+        authDomain: "psti-b376f.firebaseapp.com",
+        databaseURL:
+          "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "psti-b376f",
+        storageBucket: "psti-b376f.firebasestorage.app",
+        messagingSenderId: "658575197616",
+        appId: "1:658575197616:web:da2d5e9032eee01465c275",
+      };
 
-  <script>
-    /* ── 1. KONFIGURASI FIREBASE (lengkap) ── */
-    const firebaseConfig = {
-      apiKey:            "AIzaSyDdOxTgyrdXH9xwC7bU7fDMYIoTD3qzxvg",
-      authDomain:        "psti-b376f.firebaseapp.com",
-      projectId:         "psti-b376f",
-      storageBucket:     "psti-b376f.firebasestorage.app",
-      messagingSenderId: "658575197616",
-      appId:             "1:658575197616:web:da2d5e9032eee01465c275",
-      measurementId:     "G-EXEQT9RYD9",
-      databaseURL:       "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app"  // <-- wajib untuk RTDB
-    };
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
 
-    /* ── 2. INISIALISASI ── */
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+      // Listener data sensor
+      db.ref("/sensor").on("value", (snapshot) => {
+        const data = snapshot.val();
 
-    /* ── 3. CEK KONEKSI ── */
-    db.ref('.info/connected').on('value', snap => {
-      const ok    = snap.val();
-      const badge = document.getElementById('conn-badge');
-      badge.className   = 'badge ' + (ok ? 'badge-ok' : 'badge-err');
-      badge.textContent = ok ? '● Live' : '● Offline';
-    });
+        // Trik Debugging: Cetak data asli Firebase ke Console Browser (Tekan F12 di web untuk melihat)
+        console.log("Data Sensor dari Firebase:", data);
 
-    /* ── 4. STATE lokal ── */
-    const state = { ph:null, npk:null, fs:null, fsLabel:null, kondisi:null };
+        if (!data) {
+          document.getElementById("lastUpdate").textContent =
+            "Node /sensor kosong di Firebase";
+          return;
+        }
 
-    /* ── 5. HELPER timestamp ── */
-    function stampNow() {
-      document.getElementById('last-update').textContent =
-        'Update: ' + new Date().toLocaleTimeString('id-ID',{hour12:false});
-    }
+        // Mengonversi data ke tipe Number secara paksa agar grafik conic-gradient tidak error
+        const persen = Number(data.kesuburan) || 0;
+        const adc = data.adc !== undefined ? data.adc : "-";
 
-    /* ── 6. GAUGE setengah lingkaran ── */
-    function drawGauge(id, value, min, max, centerLabel) {
-      const canvas = document.getElementById(id);
-      const ctx = canvas.getContext('2d');
-      const W=canvas.width, H=canvas.height;
-      const cx=W/2, cy=H-14, R=58, T=14;
-      ctx.clearRect(0,0,W,H);
+        // Update grafik dan angka ke UI web
+        document
+          .getElementById("gauge")
+          .style.setProperty("--persen", persen + "%");
+        document.getElementById("persenValue").textContent = persen + "%";
+        document.getElementById("adcValue").textContent = adc;
 
-      // Latar abu
-      ctx.beginPath(); ctx.arc(cx,cy,R,Math.PI,0);
-      ctx.lineWidth=T; ctx.strokeStyle='#e0e0e0'; ctx.lineCap='round'; ctx.stroke();
-
-      // Busur warna merah→kuning→hijau
-      const g=ctx.createLinearGradient(cx-R,cy,cx+R,cy);
-      g.addColorStop(0,'#e53935'); g.addColorStop(.4,'#fdd835'); g.addColorStop(1,'#43a047');
-      ctx.beginPath(); ctx.arc(cx,cy,R,Math.PI,0);
-      ctx.lineWidth=T; ctx.strokeStyle=g; ctx.lineCap='round'; ctx.stroke();
-
-      // Jarum
-      const angle = Math.PI + ((value-min)/(max-min)) * Math.PI;
-      ctx.save(); ctx.translate(cx,cy); ctx.rotate(angle);
-      ctx.beginPath(); ctx.moveTo(-6,0); ctx.lineTo(R-4,0);
-      ctx.lineWidth=2.5; ctx.strokeStyle='#3a2d1e'; ctx.lineCap='round'; ctx.stroke();
-      ctx.restore();
-
-      // Titik pusat
-      ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2);
-      ctx.fillStyle='#3a2d1e'; ctx.fill();
-
-      // Label min/max
-      ctx.fillStyle='#888'; ctx.font='bold 9px sans-serif';
-      ctx.textAlign='left';  ctx.fillText(String(min),cx-R-4,cy+12);
-      ctx.textAlign='right'; ctx.fillText(String(max),cx+R+4,cy+12);
-
-      // Label tengah
-      ctx.fillStyle='#3a2d1e'; ctx.font='bold 11px sans-serif';
-      ctx.textAlign='center'; ctx.fillText(centerLabel,cx,cy-R/2+4);
-    }
-
-    /* ── 7. GRAFIK GARIS ── */
-    function drawLineChart(id, pts) {
-      const canvas = document.getElementById(id);
-      canvas.width = canvas.parentElement.clientWidth - 24;
-      const ctx=canvas.getContext('2d'), W=canvas.width, H=canvas.height;
-      const P={top:10,right:10,bottom:28,left:32};
-      const pW=W-P.left-P.right, pH=H-P.top-P.bottom;
-      ctx.clearRect(0,0,W,H);
-      if (!pts||pts.length<2){
-        ctx.fillStyle='#ccc'; ctx.font='12px sans-serif'; ctx.textAlign='center';
-        ctx.fillText('Menunggu data log…',W/2,H/2); return;
-      }
-      const n=pts.length;
-      const minV=Math.min(...pts)-.5, maxV=Math.max(...pts)+.5;
-      const xP=i   => P.left+(i/(n-1))*pW;
-      const yP=val => P.top+pH-((val-minV)/(maxV-minV))*pH;
-
-      for(let i=0;i<=4;i++){
-        const y=P.top+(i/4)*pH;
-        ctx.beginPath(); ctx.moveTo(P.left,y); ctx.lineTo(W-P.right,y);
-        ctx.strokeStyle='#e8e8e8'; ctx.lineWidth=1; ctx.stroke();
-        ctx.fillStyle='#aaa'; ctx.font='8px sans-serif'; ctx.textAlign='right';
-        ctx.fillText((maxV-(i/4)*(maxV-minV)).toFixed(1),P.left-4,y+3);
-      }
-      ctx.beginPath(); ctx.moveTo(P.left,P.top); ctx.lineTo(P.left,P.top+pH); ctx.lineTo(W-P.right,P.top+pH);
-      ctx.strokeStyle='#ccc'; ctx.lineWidth=1; ctx.stroke();
-      ctx.fillStyle='#aaa'; ctx.font='8px sans-serif'; ctx.textAlign='center';
-      pts.forEach((_,i)=>ctx.fillText('H'+(i+1),xP(i),H-P.bottom+12));
-
-      ctx.beginPath(); ctx.moveTo(xP(0),yP(pts[0]));
-      pts.forEach((v,i)=>ctx.lineTo(xP(i),yP(v)));
-      ctx.lineTo(xP(n-1),P.top+pH); ctx.lineTo(xP(0),P.top+pH);
-      ctx.closePath(); ctx.fillStyle='rgba(76,175,80,.12)'; ctx.fill();
-
-      ctx.beginPath(); ctx.moveTo(xP(0),yP(pts[0]));
-      pts.forEach((v,i)=>ctx.lineTo(xP(i),yP(v)));
-      ctx.strokeStyle='#388e3c'; ctx.lineWidth=2.2; ctx.lineJoin='round'; ctx.stroke();
-
-      pts.forEach((v,i)=>{
-        ctx.beginPath(); ctx.arc(xP(i),yP(v),3.5,0,Math.PI*2);
-        ctx.fillStyle='#2e7d32'; ctx.fill();
-        ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+        // Menampilkan update waktu real-time beserta detiknya
+        const now = new Date();
+        document.getElementById("lastUpdate").textContent =
+          "Update terakhir: " + now.toLocaleTimeString("id-ID");
       });
-    }
 
-    /* ── 8. HELPER label ── */
-    function npkLabel(v){ return v<30?'Rendah':v<65?'Medium':'Tinggi'; }
-    function phLabel(v){ return v<5.5?'Terlalu Asam':v<6.0?'Asam':v<=7.0?'Ideal':v<=7.5?'Netral':'Basa'; }
+      // Listener status koneksi wifi ESP32
+      db.ref("/status").on("value", (snapshot) => {
+        const status = snapshot.val();
+        console.log("Data Status dari Firebase:", status);
 
-    /* ── 9. RENDER SEMUA ELEMEN ── */
-    function refreshAll() {
-      const ph  = state.ph  ?? 7;
-      const npk = state.npk ?? 50;
-      const fs  = state.fs  ?? 0;
+        const wifiStatus = document.getElementById("wifiStatus");
+        const wifiText = document.getElementById("wifiText");
+        const ipValue = document.getElementById("ipValue");
 
-      // Gauge pH
-      drawGauge('gauge-ph', ph, 0, 14, ph.toFixed(1));
-      document.getElementById('label-ph').textContent =
-        'pH: ' + ph.toFixed(1) + ' (' + phLabel(ph) + ')';
-
-      // Gauge NPK
-      drawGauge('gauge-npk', npk, 0, 100, npkLabel(npk).substring(0,3));
-      document.getElementById('label-npk').textContent =
-        'NPK (' + npkLabel(npk) + ')';
-
-      // Fertility
-      document.getElementById('fertility-label').textContent = state.fsLabel ?? '–';
-      document.getElementById('fertility-pct').textContent   = ' (' + fs + '%)';
-
-      // Status banner
-      let warna, pesan;
-      if (fs>=80 && ph>=5.5 && ph<=7.5 && npk>=30) { warna='#2e7d32'; pesan='TANAH SUBUR - SIAP TANAM'; }
-      else if (fs>=50)                               { warna='#f57c00'; pesan='TANAH CUKUP - PERLU PERHATIAN'; }
-      else                                           { warna='#c62828'; pesan='TANAH KURANG SUBUR - BUTUH PERBAIKAN'; }
-      document.getElementById('status-banner').style.background = warna;
-      document.getElementById('status-text').textContent = pesan;
-
-      // Rekomendasi
-      if (state.kondisi) {
-        document.getElementById('rekomendasi').textContent = state.kondisi;
-      } else {
-        let rec = ph<5.5 ? 'pH rendah, tambahkan kapur dolomit. ' :
-                  ph>7.5 ? 'pH tinggi, tambahkan sulfur. ' : 'Kondisi tanah optimal. ';
-        rec += npk<30 ? 'NPK rendah, tambahkan pupuk NPK segera.' :
-               npk<65 ? 'Pertahankan pemupukan rutin.' : 'Nutrisi sangat baik.';
-        document.getElementById('rekomendasi').textContent = rec;
-      }
-
-      stampNow();
-    }
-
-    /* ── 10. LISTENER REALTIME FIREBASE ── */
-    db.ref('soilcheck/sensors/ph').on('value', snap => {
-      state.ph = snap.val(); refreshAll();
-    });
-    db.ref('soilcheck/sensors/npk').on('value', snap => {
-      state.npk = snap.val(); refreshAll();
-    });
-    db.ref('soilcheck/status/fertility_score').on('value', snap => {
-      state.fs = snap.val(); refreshAll();
-    });
-    db.ref('soilcheck/status/fertility_label').on('value', snap => {
-      state.fsLabel = snap.val(); refreshAll();
-    });
-    db.ref('soilcheck/status/kondisi').on('value', snap => {
-      state.kondisi = snap.val(); refreshAll();
-    });
-
-    // Log untuk grafik — ambil 10 terakhir
-    db.ref('soilcheck/log').limitToLast(10).on('value', snap => {
-      const data = snap.val();
-      if (!data) { drawLineChart('chart-log', []); return; }
-      const pts = Object.values(data)
-        .sort((a,b)=>(a.timestamp??0)-(b.timestamp??0))
-        .map(e => e.ph ?? 7);
-      drawLineChart('chart-log', pts);
-    });
-
-    /* ── 11. DRAW AWAL (sebelum data tiba) ── */
-    window.addEventListener('DOMContentLoaded', () => {
-      drawGauge('gauge-ph',  7,  0,  14, '…');
-      drawGauge('gauge-npk', 50, 0, 100, '…');
-      drawLineChart('chart-log', []);
-    });
-    window.addEventListener('resize', () => drawLineChart('chart-log', []));
-
-    /* ── 12. KONTROL DRAWER (Hamburger Menu) ── */
-    const menuBtn = document.getElementById('menu-btn');
-    const closeMenuBtn = document.getElementById('close-menu-btn');
-    const drawerBackdrop = document.getElementById('drawer-backdrop');
-    const drawerContent = document.getElementById('drawer-content');
-
-    function openDrawer() {
-      drawerBackdrop.classList.remove('pointer-events-none', 'opacity-0');
-      drawerBackdrop.classList.add('opacity-100');
-      drawerContent.classList.remove('-translate-x-full');
-    }
-
-    function closeDrawer() {
-      drawerBackdrop.classList.remove('opacity-100');
-      drawerBackdrop.classList.add('pointer-events-none', 'opacity-0');
-      drawerContent.classList.add('-translate-x-full');
-    }
-
-    menuBtn.addEventListener('click', openDrawer);
-    closeMenuBtn.addEventListener('click', closeDrawer);
-    drawerBackdrop.addEventListener('click', closeDrawer);
-  </script>
-</body>
+        if (
+          status &&
+          (status.wifi_connected === true || status.wifi_connected === "true")
+        ) {
+          wifiStatus.className = "status online";
+          wifiText.textContent = "ESP32 Terhubung";
+          ipValue.textContent = status.ip_address || "-";
+        } else {
+          wifiStatus.className = "status offline";
+          wifiText.textContent = "ESP32 Offline";
+          ipValue.textContent = "-";
+        }
+      });
+    </script>
+  </body>
 </html>
