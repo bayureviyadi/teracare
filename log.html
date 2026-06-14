@@ -152,12 +152,13 @@
               <th>Waktu</th>
               <th>Kesuburan (%)</th>
               <th>ADC</th>
+              <th>Kondisi Tanah</th>
               <th>IP ESP32</th>
             </tr>
           </thead>
           <tbody id="logBody">
             <tr>
-              <td colspan="4" class="empty">Memuat data...</td>
+              <td colspan="5" class="empty">Memuat data...</td>
             </tr>
           </tbody>
         </table>
@@ -186,7 +187,7 @@
       function renderLogs(data) {
         if (!data) {
           logBody.innerHTML =
-            '<tr><td colspan="4" class="empty">Belum ada data log</td></tr>';
+            '<tr><td colspan="5" class="empty">Belum ada data log</td></tr>';
           statusText.textContent = "Belum ada data log";
           return;
         }
@@ -203,6 +204,7 @@
                 <td>${item.waktu || "-"}</td>
                 <td>${item.kesuburan !== undefined ? item.kesuburan + "%" : "-"}</td>
                 <td>${item.adc !== undefined ? item.adc : "-"}</td>
+                <td>${item.kondisi || "-"}</td>
                 <td>${item.ip || "-"}</td>
               </tr>
             `
