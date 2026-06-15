@@ -2,456 +2,239 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-    <title>Log Data - Kesuburan Tanah</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Log Data Kesuburan Tanah</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-    <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
     <style>
-      :root {
-        --green-dark: #1b3a2d;
-        --green-mid: #2d6a4f;
-        --green-light: #52b788;
-        --green-pale: #d8f3dc;
-        --accent: #40916c;
-        --danger: #e63946;
-        --danger-bg: #fff0f1;
-        --text: #1a2e25;
-        --text-muted: #7a9e8e;
-        --bg: #f0f7f2;
-        --card: #ffffff;
-        --radius: 20px;
-        --bottom-nav-h: 70px;
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Segoe UI", sans-serif;
       }
-      * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
-        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-        background: var(--bg);
+        background: linear-gradient(135deg, #1f4037, #99f2c8);
         min-height: 100vh;
-        padding-bottom: calc(var(--bottom-nav-h) + 16px);
-        color: var(--text);
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 20px;
+      }
+      .card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 30px;
+        max-width: 500px;
+        width: 100%;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        margin-top: 20px;
+      }
+      h1 {
+        color: #1f4037;
+        font-size: 1.5rem;
+        margin-bottom: 20px;
       }
 
-      .app-header {
-        background: var(--green-dark);
-        padding: 20px 20px 24px; color: #fff;
-        position: relative; overflow: hidden;
+      /* Navigasi Tab */
+      .nav {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        background: #f4f9f8;
+        border-radius: 12px;
+        padding: 6px;
       }
-      .app-header::after {
-        content: ""; position: absolute;
-        bottom: -30px; left: -10%; right: -10%;
-        height: 60px; background: var(--bg); border-radius: 50%;
+      .nav a {
+        flex: 1;
+        text-decoration: none;
+        padding: 10px;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #1f4037;
+        transition: background 0.2s ease, color 0.2s ease;
       }
-      .header-top { display: flex; align-items: center; justify-content: space-between; }
-      .header-left { display: flex; align-items: center; gap: 10px; }
-      .btn-back {
-        background: rgba(255,255,255,0.15); border: none; color: #fff; cursor: pointer;
-        width: 32px; height: 32px; border-radius: 10px;
-        display: flex; align-items: center; justify-content: center; transition: background 0.2s;
+      .nav a.active {
+        background: #1f4037;
+        color: #fff;
       }
-      .btn-back:hover { background: rgba(255,255,255,0.25); }
-      .header-top h1 { font-size: 1.05rem; font-weight: 700; opacity: 0.95; }
-      .header-sub { font-size: 0.78rem; opacity: 0.6; margin-top: 2px; }
-
-      .content {
-        padding: 28px 16px 0; max-width: 480px; margin: 0 auto;
-      }
-
-      /* Chart */
-      .chart-card {
-        background: var(--card); border-radius: var(--radius); padding: 16px;
-        box-shadow: 0 2px 16px rgba(27,58,45,0.08); margin-bottom: 14px;
-      }
-      .chart-card canvas { max-height: 200px; }
-
-      /* Filter */
-      .filter-card {
-        background: var(--card); border-radius: var(--radius); padding: 16px;
-        box-shadow: 0 2px 12px rgba(27,58,45,0.07); margin-bottom: 14px;
-      }
-      .filter-card .section-title {
-        font-size: 0.78rem; font-weight: 700; color: var(--text-muted);
-        text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;
-        display: flex; align-items: center; gap: 6px;
-      }
-      .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-      .filter-group label {
-        display: block; font-size: 0.73rem; font-weight: 600;
-        color: var(--text-muted); margin-bottom: 5px;
-      }
-      .filter-group input {
-        width: 100%; padding: 9px 10px; border-radius: 10px;
-        border: 1.5px solid #d8f3dc; font-size: 0.82rem;
-        color: var(--text); background: var(--bg); font-family: inherit;
-      }
-      .filter-group input:focus { outline: none; border-color: var(--accent); }
-
-      /* Toolbar */
-      .toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-      .btn {
-        display: flex; align-items: center; justify-content: center; gap: 7px;
-        padding: 11px 12px; border: none; border-radius: 12px;
-        font-size: 0.83rem; font-weight: 700; cursor: pointer;
-        transition: opacity 0.2s ease, transform 0.1s ease; font-family: inherit;
-      }
-      .btn:active { transform: scale(0.97); }
-      .btn-primary { background: var(--green-dark); color: #fff; }
-      .btn-danger { background: var(--danger-bg); color: var(--danger); }
-      .btn-reset { background: var(--green-pale); color: var(--accent); width: 100%; }
-      .btn:hover { opacity: 0.88; }
-
-      /* Status */
-      .status-bar {
-        display: flex; align-items: center; justify-content: space-between;
-        margin-bottom: 10px; padding: 0 2px;
-      }
-      .status-bar .count {
-        font-size: 0.78rem; color: var(--text-muted); font-weight: 600;
-        display: flex; align-items: center; gap: 5px;
+      .nav a:not(.active):hover {
+        background: #e2efe9;
       }
 
-      /* Log list */
-      .table-card {
-        background: var(--card); border-radius: var(--radius);
-        box-shadow: 0 2px 12px rgba(27,58,45,0.07); overflow: hidden;
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
       }
-      .log-item {
-        padding: 14px 16px; border-bottom: 1px solid #f0f6f2;
-        display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center;
+      .toolbar button {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
       }
-      .log-item:last-child { border-bottom: none; }
-      .log-time {
-        font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;
-        display: flex; align-items: center; gap: 4px;
+      .btn-refresh {
+        background: #1f4037;
+        color: #fff;
       }
-      .log-kondisi { font-size: 0.88rem; font-weight: 700; color: var(--text); margin-bottom: 3px; }
-      .log-detail { font-size: 0.76rem; color: var(--text-muted); display: flex; gap: 12px; }
-      .log-detail span { display: flex; align-items: center; gap: 3px; }
-      .log-pct { font-size: 1.4rem; font-weight: 800; color: var(--accent); text-align: right; line-height: 1; }
-      .log-pct.warning { color: var(--danger); }
-      .log-pct.basah { color: #2980b9; }
-
-      .empty-state {
-        padding: 48px 20px; text-align: center; color: var(--text-muted);
-        display: flex; flex-direction: column; align-items: center; gap: 10px;
+      .btn-clear {
+        background: #fde2e2;
+        color: #c0392b;
       }
-      .empty-state p { font-size: 0.88rem; }
-
-      /* No kebun */
-      .no-kebun {
-        background: var(--card); border-radius: var(--radius);
-        padding: 32px 20px; text-align: center;
-        box-shadow: 0 2px 16px rgba(27,58,45,0.08);
-      }
-      .no-kebun p { font-size: 0.88rem; color: var(--text-muted); margin: 10px 0 16px; }
-      .btn-ke-home {
-        display: inline-flex; align-items: center; gap: 7px;
-        padding: 11px 20px; background: var(--green-dark); color: #fff;
-        border: none; border-radius: 12px; font-size: 0.88rem; font-weight: 700;
-        cursor: pointer; font-family: inherit; text-decoration: none;
+      .toolbar button:hover {
+        opacity: 0.85;
       }
 
-      /* Bottom Nav */
-      .bottom-nav {
-        position: fixed; bottom: 0; left: 0; right: 0;
-        height: var(--bottom-nav-h); background: var(--card);
-        box-shadow: 0 -2px 20px rgba(27,58,45,0.12);
-        display: flex; align-items: stretch; z-index: 100;
-        padding: 0 8px; padding-bottom: env(safe-area-inset-bottom);
+      .table-wrap {
+        max-height: 420px;
+        overflow-y: auto;
+        border-radius: 12px;
+        border: 1px solid #e2efe9;
       }
-      .nav-item {
-        flex: 1; display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-        gap: 4px; text-decoration: none; color: var(--text-muted);
-        font-size: 0.68rem; font-weight: 600; border-radius: 12px;
-        transition: color 0.2s ease, background 0.2s ease;
-        padding: 8px 4px; position: relative;
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
       }
-      .nav-item .nav-icon { font-size: 1.45rem; line-height: 1; transition: transform 0.2s ease; }
-      .nav-item.active { color: var(--accent); }
-      .nav-item.active .nav-icon { transform: translateY(-2px); }
-      .nav-item.active::before {
-        content: ""; position: absolute; top: 6px;
-        width: 32px; height: 3px; background: var(--accent); border-radius: 999px;
+      thead th {
+        background: #1f4037;
+        color: #fff;
+        padding: 10px;
+        position: sticky;
+        top: 0;
+        text-align: left;
       }
-      .nav-item:not(.active):hover { color: var(--green-mid); background: var(--green-pale); }
+      tbody td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #f0f0f0;
+        color: #34495e;
+        text-align: left;
+      }
+      tbody tr:nth-child(even) {
+        background: #f9fcfb;
+      }
+      .empty {
+        padding: 30px;
+        color: #95a5a6;
+        font-size: 0.9rem;
+      }
+      .status-text {
+        margin-top: 12px;
+        font-size: 0.8rem;
+        color: #95a5a6;
+      }
     </style>
   </head>
   <body>
+    <div class="card">
+      <h1>📋 Log Data Kesuburan Tanah</h1>
 
-    <div class="app-header">
-      <div class="header-top">
-        <div class="header-left">
-          <button class="btn-back" onclick="window.location.href='home.html'">
-            <span class="iconify" data-icon="mdi:arrow-left" data-width="18"></span>
-          </button>
-          <h1 id="headerTitle">📋 Log Data</h1>
-        </div>
+      <nav class="nav">
+        <a href="index.html">Monitoring</a>
+        <a href="log.html" class="active">Log Data</a>
+      </nav>
+
+      <div class="toolbar">
+        <button class="btn-refresh" onclick="muatUlang()">🔄 Refresh</button>
+        <button class="btn-clear" onclick="hapusSemua()">🗑️ Hapus Semua</button>
       </div>
-      <div class="header-sub" id="headerSub">Riwayat pembacaan sensor tanah</div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Kesuburan (%)</th>
+              <th>ADC</th>
+              <th>Kondisi Tanah</th>
+              <th>IP ESP32</th>
+            </tr>
+          </thead>
+          <tbody id="logBody">
+            <tr>
+              <td colspan="5" class="empty">Memuat data...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="status-text" id="statusText">Menunggu data...</div>
     </div>
-
-    <div class="content">
-
-      <div id="noKebunNotice" class="no-kebun" style="display:none">
-        <span style="font-size:2.5rem">🪴</span>
-        <p>Belum ada kebun yang dipilih.<br>Kembali ke Beranda dan pilih kebun terlebih dahulu.</p>
-        <a href="home.html" class="btn-ke-home">
-          <span class="iconify" data-icon="mdi:home-outline" data-width="17"></span>
-          Ke Beranda
-        </a>
-      </div>
-
-      <div id="mainContent">
-        <div class="chart-card">
-          <canvas id="trenChart"></canvas>
-        </div>
-
-        <div class="filter-card">
-          <div class="section-title">
-            <span class="iconify" data-icon="mdi:filter-outline" data-width="14"></span>
-            Filter Tanggal
-          </div>
-          <div class="filter-row">
-            <div class="filter-group">
-              <label>Dari Tanggal</label>
-              <input type="date" id="filterDariTanggal" onchange="terapkanFilter()" />
-            </div>
-            <div class="filter-group">
-              <label>Sampai Tanggal</label>
-              <input type="date" id="filterSampaiTanggal" onchange="terapkanFilter()" />
-            </div>
-          </div>
-          <button class="btn btn-reset" onclick="resetFilter()">
-            <span class="iconify" data-icon="mdi:filter-remove-outline" data-width="16"></span>
-            Reset Filter
-          </button>
-        </div>
-
-        <div class="toolbar">
-          <button class="btn btn-primary" onclick="muatUlang()">
-            <span class="iconify" data-icon="mdi:refresh" data-width="17"></span>
-            Refresh
-          </button>
-          <button class="btn btn-danger" onclick="hapusSemua()">
-            <span class="iconify" data-icon="mdi:delete-outline" data-width="17"></span>
-            Hapus Semua
-          </button>
-        </div>
-
-        <div class="status-bar">
-          <div class="count" id="statusText">
-            <span class="iconify" data-icon="mdi:database-outline" data-width="14"></span>
-            Memuat data...
-          </div>
-        </div>
-
-        <div class="table-card">
-          <div class="log-list" id="logBody">
-            <div class="empty-state">
-              <span class="iconify" data-icon="mdi:leaf-circle-outline" data-width="48"></span>
-              <p>Memuat data...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <nav class="bottom-nav">
-      <a href="home.html" class="nav-item">
-        <span class="nav-icon iconify" data-icon="mdi:home-outline" data-width="24"></span>
-        Beranda
-      </a>
-      <a href="index.html" class="nav-item">
-        <span class="nav-icon iconify" data-icon="mdi:sprout" data-width="24"></span>
-        Monitor
-      </a>
-      <a href="log.html" class="nav-item active">
-        <span class="nav-icon iconify" data-icon="mdi:clipboard-text-clock" data-width="24"></span>
-        Log Data
-      </a>
-      <a href="pengaturan.html" class="nav-item">
-        <span class="nav-icon iconify" data-icon="mdi:tune-variant" data-width="24"></span>
-        Pengaturan
-      </a>
-    </nav>
 
     <script>
       const firebaseConfig = {
         apiKey: "AIzaSyDdOxTgyrdXH9xwC7bU7fDMYIoTD3qzxvg",
         authDomain: "psti-b376f.firebaseapp.com",
-        databaseURL: "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app",
+        databaseURL:
+          "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app",
         projectId: "psti-b376f",
         storageBucket: "psti-b376f.firebasestorage.app",
         messagingSenderId: "658575197616",
         appId: "1:658575197616:web:da2d5e9032eee01465c275",
       };
+
       firebase.initializeApp(firebaseConfig);
       const db = firebase.database();
-
-      const kebunId = sessionStorage.getItem("kebunId");
-      const kebunNama = sessionStorage.getItem("kebunNama") || "Kebun";
-
-      if (!kebunId) {
-        document.getElementById("noKebunNotice").style.display = "block";
-        document.getElementById("mainContent").style.display = "none";
-      } else {
-        document.getElementById("headerTitle").textContent = "📋 " + kebunNama;
-        document.getElementById("headerSub").textContent = "Riwayat sensor · " + kebunId;
-        initLog();
-      }
-
       const logBody = document.getElementById("logBody");
       const statusText = document.getElementById("statusText");
-      let semuaEntri = [];
-
-      let trenChart;
-      function initChart() {
-        const ctx = document.getElementById("trenChart").getContext("2d");
-        trenChart = new Chart(ctx, {
-          type: "line",
-          data: {
-            labels: [],
-            datasets: [
-              {
-                label: "Kesuburan (%)",
-                data: [], borderColor: "#40916c",
-                backgroundColor: "rgba(64,145,108,0.12)",
-                tension: 0.4, fill: true, yAxisID: "y",
-                pointRadius: 3, pointBackgroundColor: "#40916c",
-              },
-              {
-                label: "ADC",
-                data: [], borderColor: "#1b3a2d",
-                backgroundColor: "rgba(27,58,45,0.06)",
-                tension: 0.4, fill: false, yAxisID: "y1",
-                pointRadius: 2, pointBackgroundColor: "#1b3a2d",
-              },
-            ],
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: "index", intersect: false },
-            plugins: { legend: { labels: { font: { size: 11, family: "Segoe UI" }, boxWidth: 12, padding: 12 } } },
-            scales: {
-              x: { ticks: { font: { size: 10 }, maxTicksLimit: 6 }, grid: { display: false } },
-              y: {
-                type: "linear", position: "left",
-                title: { display: true, text: "Kesuburan (%)", font: { size: 10 } },
-                min: 0, max: 100, ticks: { font: { size: 10 } },
-              },
-              y1: {
-                type: "linear", position: "right",
-                title: { display: true, text: "ADC", font: { size: 10 } },
-                grid: { drawOnChartArea: false }, ticks: { font: { size: 10 } },
-              },
-            },
-          },
-        });
-      }
-
-      function updateChart(entries) {
-        if (!trenChart) return;
-        const sorted = [...entries].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-        const recent = sorted.slice(-30);
-        trenChart.data.labels = recent.map(item => {
-          const d = new Date(item.timestamp || 0);
-          return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-        });
-        trenChart.data.datasets[0].data = recent.map(item => Number(item.kesuburan) || 0);
-        trenChart.data.datasets[1].data = recent.map(item => Number(item.adc) || 0);
-        trenChart.update();
-      }
 
       function renderLogs(data) {
-        if (!data) { semuaEntri = []; tampilkanData([]); return; }
-        semuaEntri = Object.values(data).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        terapkanFilter();
-      }
-
-      function terapkanFilter() {
-        const dari = document.getElementById("filterDariTanggal").value;
-        const sampai = document.getElementById("filterSampaiTanggal").value;
-        let hasil = semuaEntri;
-        if (dari) hasil = hasil.filter(item => (item.timestamp || 0) >= new Date(dari + "T00:00:00").getTime());
-        if (sampai) hasil = hasil.filter(item => (item.timestamp || 0) <= new Date(sampai + "T23:59:59").getTime());
-        tampilkanData(hasil);
-      }
-
-      function resetFilter() {
-        document.getElementById("filterDariTanggal").value = "";
-        document.getElementById("filterSampaiTanggal").value = "";
-        terapkanFilter();
-      }
-
-      function getKondisiClass(kondisi) {
-        if (!kondisi) return "";
-        if (kondisi.includes("Kering")) return "warning";
-        if (kondisi.includes("Basah")) return "basah";
-        return "";
-      }
-      function getKondisiIcon(kondisi) {
-        if (!kondisi) return "mdi:help-circle-outline";
-        if (kondisi.includes("Kering")) return "mdi:thermometer-high";
-        if (kondisi.includes("Basah")) return "mdi:water-alert";
-        return "mdi:leaf";
-      }
-
-      function tampilkanData(entries) {
-        updateChart(entries);
-        if (entries.length === 0) {
-          logBody.innerHTML = `<div class="empty-state">
-            <span class="iconify" data-icon="mdi:leaf-circle-outline" data-width="48"></span>
-            <p>Tidak ada data yang sesuai filter</p>
-          </div>`;
-          statusText.innerHTML = `<span class="iconify" data-icon="mdi:database-outline" data-width="14"></span> 0 catatan`;
-          if (trenChart) { trenChart.data.labels = []; trenChart.data.datasets.forEach(ds => ds.data = []); trenChart.update(); }
+        if (!data) {
+          logBody.innerHTML =
+            '<tr><td colspan="5" class="empty">Belum ada data log</td></tr>';
+          statusText.textContent = "Belum ada data log";
           return;
         }
-        statusText.innerHTML = `<span class="iconify" data-icon="mdi:database-outline" data-width="14"></span> ${entries.length} catatan`;
-        logBody.innerHTML = entries.map(item => {
-          const kelas = getKondisiClass(item.kondisi);
-          const icon = getKondisiIcon(item.kondisi);
-          return `<div class="log-item">
-            <div>
-              <div class="log-time">
-                <span class="iconify" data-icon="mdi:clock-outline" data-width="12"></span>
-                ${item.waktu || "-"}
-              </div>
-              <div class="log-kondisi">
-                <span class="iconify" data-icon="${icon}" data-width="14" style="margin-right:4px;vertical-align:middle"></span>
-                ${item.kondisi || "-"}
-              </div>
-              <div class="log-detail">
-                <span><span class="iconify" data-icon="mdi:chip" data-width="12"></span> ADC: ${item.adc !== undefined ? item.adc : "-"}</span>
-                <span><span class="iconify" data-icon="mdi:wifi" data-width="12"></span> ${item.ip || "-"}</span>
-              </div>
-            </div>
-            <div class="log-pct ${kelas}">${item.kesuburan !== undefined ? item.kesuburan + "%" : "-"}</div>
-          </div>`;
-        }).join("");
-        if (window.Iconify) Iconify.scan();
+
+        // Ubah object menjadi array, urutkan dari terbaru ke terlama
+        const entries = Object.values(data).sort(
+          (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
+        );
+
+        logBody.innerHTML = entries
+          .map(
+            (item) => `
+              <tr>
+                <td>${item.waktu || "-"}</td>
+                <td>${item.kesuburan !== undefined ? item.kesuburan + "%" : "-"}</td>
+                <td>${item.adc !== undefined ? item.adc : "-"}</td>
+                <td>${item.kondisi || "-"}</td>
+                <td>${item.ip || "-"}</td>
+              </tr>
+            `
+          )
+          .join("");
+
+        statusText.textContent = `Total ${entries.length} catatan`;
       }
 
-      function initLog() {
-        initChart();
-        db.ref(`/kebun/${kebunId}/logs`).on("value", snap => renderLogs(snap.val()));
-      }
+      // Listener realtime data log
+      db.ref("/logs").on("value", (snapshot) => {
+        renderLogs(snapshot.val());
+      });
 
       function muatUlang() {
-        if (!kebunId) return;
-        statusText.innerHTML = `<span class="iconify" data-icon="mdi:loading" data-width="14"></span> Memuat ulang...`;
-        db.ref(`/kebun/${kebunId}/logs`).get().then(snap => renderLogs(snap.val()));
+        statusText.textContent = "Memuat ulang...";
+        db.ref("/logs")
+          .get()
+          .then((snapshot) => renderLogs(snapshot.val()));
       }
 
       function hapusSemua() {
-        if (!kebunId) return;
-        if (!confirm("Hapus semua data log kebun ini? Tindakan ini tidak bisa dibatalkan.")) return;
-        db.ref(`/kebun/${kebunId}/logs`).remove().then(() => {
-          statusText.innerHTML = `<span class="iconify" data-icon="mdi:check-circle-outline" data-width="14"></span> Semua log dihapus`;
-        });
+        if (!confirm("Hapus semua data log? Tindakan ini tidak bisa dibatalkan.")) {
+          return;
+        }
+        db.ref("/logs")
+          .remove()
+          .then(() => {
+            statusText.textContent = "Semua log telah dihapus";
+          });
       }
     </script>
   </body>
