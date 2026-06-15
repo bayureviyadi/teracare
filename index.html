@@ -2,221 +2,330 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Monitoring Kesuburan Tanah</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Monitor - Kesuburan Tanah</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
     <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        font-family: "Segoe UI", sans-serif;
+      :root {
+        --green-dark: #1b3a2d;
+        --green-mid: #2d6a4f;
+        --green-light: #52b788;
+        --green-pale: #d8f3dc;
+        --accent: #40916c;
+        --danger: #e63946;
+        --danger-bg: #fff0f1;
+        --warn: #f4a261;
+        --warn-bg: #fff7ed;
+        --blue: #2980b9;
+        --blue-bg: #e8f4fc;
+        --text: #1a2e25;
+        --text-muted: #7a9e8e;
+        --bg: #f0f7f2;
+        --card: #ffffff;
+        --radius: 20px;
+        --bottom-nav-h: 70px;
       }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
-        background: linear-gradient(135deg, #1f4037, #99f2c8);
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        background: var(--bg);
         min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-      }
-      .card {
-        background: #fff;
-        border-radius: 20px;
-        padding: 30px;
-        max-width: 400px;
-        width: 100%;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        text-align: center;
-      }
-      h1 {
-        color: #1f4037;
-        font-size: 1.5rem;
-        margin-bottom: 20px;
+        padding-bottom: calc(var(--bottom-nav-h) + 16px);
+        color: var(--text);
       }
 
-      /* Navigasi Tab */
-      .nav {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-        background: #f4f9f8;
-        border-radius: 12px;
-        padding: 6px;
-      }
-      .nav a {
-        flex: 1;
-        text-decoration: none;
-        padding: 10px;
-        border-radius: 10px;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #1f4037;
-        transition: background 0.2s ease, color 0.2s ease;
-      }
-      .nav a.active {
-        background: #1f4037;
+      .app-header {
+        background: var(--green-dark);
+        padding: 20px 20px 24px;
         color: #fff;
-      }
-      .nav a:not(.active):hover {
-        background: #e2efe9;
-      }
-
-      .status {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 16px;
-        border-radius: 999px;
-        font-size: 0.9rem;
-        font-weight: 600;
-        margin-bottom: 25px;
-      }
-      .status.online {
-        background: #d4f8e8;
-        color: #1f8a4c;
-      }
-      .status.offline {
-        background: #fde2e2;
-        color: #c0392b;
-      }
-      .dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: currentColor;
-      }
-      .gauge {
-        width: 200px;
-        height: 200px;
-        margin: 0 auto 20px;
-        border-radius: 50%;
-        background: conic-gradient(
-          #27ae60 0% var(--persen, 0%),
-          #ecf0f1 var(--persen, 0%) 100%
-        );
-        display: flex;
-        align-items: center;
-        justify-content: center;
         position: relative;
-        transition: background 0.5s ease;
+        overflow: hidden;
       }
-      .gauge::before {
+      .app-header::after {
         content: "";
         position: absolute;
-        width: 160px;
-        height: 160px;
-        background: #fff;
+        bottom: -30px; left: -10%; right: -10%;
+        height: 60px;
+        background: var(--bg);
         border-radius: 50%;
       }
-      .gauge-value {
-        position: relative;
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #1f4037;
-      }
-      .gauge-label {
-        position: absolute;
-        bottom: 55px;
-        font-size: 0.85rem;
-        color: #7f8c8d;
-      }
-      .info {
-        display: flex;
+      .header-top {
+        display: flex; align-items: center;
         justify-content: space-between;
-        margin-top: 20px;
-        padding: 15px;
-        background: #f4f9f8;
-        border-radius: 12px;
-        font-size: 0.9rem;
-        color: #34495e;
+        margin-bottom: 4px;
       }
-      .info div span {
-        display: block;
-        font-weight: bold;
-        font-size: 1.1rem;
-        color: #1f4037;
-        margin-top: 4px;
+      .header-left { display: flex; align-items: center; gap: 10px; }
+      .btn-back {
+        background: rgba(255,255,255,0.15);
+        border: none; color: #fff; cursor: pointer;
+        width: 32px; height: 32px; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        transition: background 0.2s;
       }
-      .updated {
-        margin-top: 15px;
-        font-size: 0.8rem;
-        color: #95a5a6;
+      .btn-back:hover { background: rgba(255,255,255,0.25); }
+      .header-top h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.3px; opacity: 0.95; }
+      .header-badge {
+        display: flex; align-items: center; gap: 6px;
+        padding: 5px 12px; border-radius: 999px;
+        font-size: 0.78rem; font-weight: 700;
+        transition: all 0.3s ease;
       }
-      .status-tanah {
-        margin-top: 15px;
-        padding: 10px;
-        border-radius: 10px;
-        background: #f4f9f8;
-        color: #1f4037;
-        font-weight: 600;
-        font-size: 0.95rem;
+      .header-badge.online { background: rgba(82,183,136,0.25); color: #74c69d; }
+      .header-badge.offline { background: rgba(230,57,70,0.25); color: #ff8fa3; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+      .offline .dot { animation: none; }
+      @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+      .header-sub { font-size: 0.78rem; opacity: 0.6; margin-top: 2px; }
+
+      .content {
+        padding: 28px 16px 0;
+        max-width: 480px;
+        margin: 0 auto;
       }
+
+      /* Gauge */
+      .gauge-card {
+        background: var(--card); border-radius: var(--radius);
+        padding: 28px 20px 24px; text-align: center;
+        box-shadow: 0 2px 16px rgba(27,58,45,0.08); margin-bottom: 14px;
+      }
+      .gauge-wrap {
+        position: relative; width: 180px; height: 180px; margin: 0 auto 16px;
+      }
+      .gauge-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+      .gauge-track { fill: none; stroke: #e8f0ec; stroke-width: 14; }
+      .gauge-fill {
+        fill: none; stroke: var(--green-light); stroke-width: 14;
+        stroke-linecap: round;
+        stroke-dasharray: 502; stroke-dashoffset: 502;
+        transition: stroke-dashoffset 1s ease, stroke 0.5s ease;
+      }
+      .gauge-center {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+      }
+      .gauge-pct { font-size: 2.6rem; font-weight: 800; color: var(--green-dark); line-height: 1; }
+      .gauge-lbl { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-top: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
+      .kondisi-badge {
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 8px 18px; border-radius: 12px;
+        font-size: 0.88rem; font-weight: 700;
+        background: var(--green-pale); color: var(--accent);
+        transition: all 0.4s ease;
+      }
+      .kondisi-badge.warning { background: var(--danger-bg); color: var(--danger); }
+      .kondisi-badge.basah { background: var(--blue-bg); color: var(--blue); }
+
+      /* Info cards */
+      .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+      .info-card {
+        background: var(--card); border-radius: 16px; padding: 16px;
+        box-shadow: 0 2px 12px rgba(27,58,45,0.07);
+      }
+      .info-card .ic-icon {
+        width: 36px; height: 36px; border-radius: 10px;
+        background: var(--green-pale); display: flex; align-items: center; justify-content: center;
+        margin-bottom: 10px; color: var(--accent);
+      }
+      .info-card .ic-lbl { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+      .info-card .ic-val { font-size: 1.15rem; font-weight: 800; color: var(--text); }
+
+      /* Last update */
+      .last-update {
+        text-align: center; font-size: 0.78rem; color: var(--text-muted);
+        margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 5px;
+      }
+
+      /* No kebun notice */
+      .no-kebun {
+        background: var(--card); border-radius: var(--radius);
+        padding: 32px 20px; text-align: center;
+        box-shadow: 0 2px 16px rgba(27,58,45,0.08);
+        display: none;
+      }
+      .no-kebun p { font-size: 0.88rem; color: var(--text-muted); margin: 10px 0 16px; }
+      .btn-ke-home {
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 11px 20px; background: var(--green-dark); color: #fff;
+        border: none; border-radius: 12px; font-size: 0.88rem; font-weight: 700;
+        cursor: pointer; font-family: inherit; text-decoration: none;
+      }
+
+      /* Bottom Nav */
+      .bottom-nav {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        height: var(--bottom-nav-h); background: var(--card);
+        box-shadow: 0 -2px 20px rgba(27,58,45,0.12);
+        display: flex; align-items: stretch; z-index: 100;
+        padding: 0 8px; padding-bottom: env(safe-area-inset-bottom);
+      }
+      .nav-item {
+        flex: 1; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 4px; text-decoration: none; color: var(--text-muted);
+        font-size: 0.68rem; font-weight: 600; border-radius: 12px;
+        transition: color 0.2s ease, background 0.2s ease;
+        padding: 8px 4px; position: relative; cursor: pointer;
+      }
+      .nav-item .nav-icon { font-size: 1.45rem; line-height: 1; transition: transform 0.2s ease; }
+      .nav-item.active { color: var(--accent); }
+      .nav-item.active .nav-icon { transform: translateY(-2px); }
+      .nav-item.active::before {
+        content: ""; position: absolute; top: 6px;
+        width: 32px; height: 3px; background: var(--accent); border-radius: 999px;
+      }
+      .nav-item:not(.active):hover { color: var(--green-mid); background: var(--green-pale); }
     </style>
   </head>
   <body>
-    <div class="card">
-      <h1>🌱 Monitoring Kesuburan Tanah</h1>
 
-      <nav class="nav">
-        <a href="index.html" class="active">Monitoring</a>
-        <a href="log.html">Log Data</a>
-      </nav>
-
-      <div id="wifiStatus" class="status offline">
-        <span class="dot"></span>
-        <span id="wifiText">Memeriksa koneksi...</span>
-      </div>
-
-      <div class="gauge" id="gauge" style="--persen: 0%">
-        <div class="gauge-value" id="persenValue">0%</div>
-        <div class="gauge-label">Estimasi Kesuburan</div>
-      </div>
-
-      <div class="info">
-        <div>
-          ADC Raw
-          <span id="adcValue">-</span>
+    <div class="app-header">
+      <div class="header-top">
+        <div class="header-left">
+          <button class="btn-back" onclick="window.location.href='home.html'">
+            <span class="iconify" data-icon="mdi:arrow-left" data-width="18"></span>
+          </button>
+          <h1 id="headerTitle">🌱 Monitor</h1>
         </div>
-        <div>
-          IP ESP32
-          <span id="ipValue">-</span>
+        <div id="wifiStatus" class="header-badge offline">
+          <span class="dot"></span>
+          <span id="wifiText">Offline</span>
         </div>
       </div>
-
-      <div class="status-tanah" id="statusTanahText">-</div>
-
-      <div class="updated" id="lastUpdate">Belum ada data</div>
+      <div class="header-sub" id="headerSub">Monitoring real-time sensor ESP32</div>
     </div>
 
+    <div class="content">
+
+      <!-- Jika tidak ada kebun dipilih -->
+      <div class="no-kebun" id="noKebunNotice">
+        <span style="font-size:2.5rem">🪴</span>
+        <p>Belum ada kebun yang dipilih.<br>Kembali ke Beranda dan pilih kebun terlebih dahulu.</p>
+        <a href="home.html" class="btn-ke-home">
+          <span class="iconify" data-icon="mdi:home-outline" data-width="17"></span>
+          Ke Beranda
+        </a>
+      </div>
+
+      <div id="mainContent">
+        <div class="gauge-card">
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" viewBox="0 0 180 180">
+              <circle class="gauge-track" cx="90" cy="90" r="80" />
+              <circle class="gauge-fill" id="gaugeFill" cx="90" cy="90" r="80" />
+            </svg>
+            <div class="gauge-center">
+              <div class="gauge-pct" id="persenValue">0%</div>
+              <div class="gauge-lbl">Kesuburan</div>
+            </div>
+          </div>
+          <div class="kondisi-badge" id="kondisiBadge">
+            <span class="iconify" data-icon="mdi:leaf" data-width="16"></span>
+            <span id="kondisiText">Menunggu data...</span>
+          </div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-card">
+            <div class="ic-icon">
+              <span class="iconify" data-icon="mdi:chip" data-width="20"></span>
+            </div>
+            <div class="ic-lbl">ADC Raw</div>
+            <div class="ic-val" id="adcValue">—</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-icon">
+              <span class="iconify" data-icon="mdi:wifi" data-width="20"></span>
+            </div>
+            <div class="ic-lbl">IP ESP32</div>
+            <div class="ic-val" id="ipValue" style="font-size:0.9rem">—</div>
+          </div>
+        </div>
+
+        <div class="last-update" id="lastUpdate">
+          <span class="iconify" data-icon="mdi:clock-outline" data-width="13"></span>
+          Belum ada data
+        </div>
+      </div>
+
+    </div>
+
+    <nav class="bottom-nav">
+      <a href="home.html" class="nav-item">
+        <span class="nav-icon iconify" data-icon="mdi:home-outline" data-width="24"></span>
+        Beranda
+      </a>
+      <a href="index.html" class="nav-item active">
+        <span class="nav-icon iconify" data-icon="mdi:sprout" data-width="24"></span>
+        Monitor
+      </a>
+      <a href="log.html" class="nav-item">
+        <span class="nav-icon iconify" data-icon="mdi:clipboard-text-clock" data-width="24"></span>
+        Log Data
+      </a>
+      <a href="pengaturan.html" class="nav-item">
+        <span class="nav-icon iconify" data-icon="mdi:tune-variant" data-width="24"></span>
+        Pengaturan
+      </a>
+    </nav>
+
     <script>
-      // Konfigurasi Firebase
       const firebaseConfig = {
         apiKey: "AIzaSyDdOxTgyrdXH9xwC7bU7fDMYIoTD3qzxvg",
         authDomain: "psti-b376f.firebaseapp.com",
-        databaseURL:
-          "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app",
+        databaseURL: "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app",
         projectId: "psti-b376f",
         storageBucket: "psti-b376f.firebasestorage.app",
         messagingSenderId: "658575197616",
         appId: "1:658575197616:web:da2d5e9032eee01465c275",
       };
-
       firebase.initializeApp(firebaseConfig);
       const db = firebase.database();
 
-      // Interval minimum antar pencatatan log (ms) agar database tidak penuh
-      const LOG_INTERVAL_MS = 5 * 60 * 1000; // 5 menit
+      // ── Ambil kebun dari sessionStorage ──
+      const kebunId = sessionStorage.getItem("kebunId");
+      const kebunNama = sessionStorage.getItem("kebunNama") || "Kebun";
+
+      if (!kebunId) {
+        document.getElementById("noKebunNotice").style.display = "block";
+        document.getElementById("mainContent").style.display = "none";
+      } else {
+        document.getElementById("headerTitle").textContent = "🌱 " + kebunNama;
+        document.getElementById("headerSub").textContent = "Monitoring real-time · " + kebunId;
+        initMonitor();
+      }
+
+      // ── Path Firebase per kebun ──
+      // Sensor  → /kebun/{id}/sensor
+      // Status  → /kebun/{id}/status
+      // Config  → /kebun/{id}/config/ambangBatas
+      // Logs    → /kebun/{id}/logs
+
+      const CIRC = 502.65;
+      const gaugeFill = document.getElementById("gaugeFill");
+      let ambangKering = 1000;
+      let ambangBasah = 2500;
+      let ipTerakhir = "-";
+
+      const LOG_INTERVAL_MS = 5 * 60 * 1000;
       let lastLogTime = 0;
 
-      // Simpan satu entri log ke /logs
+      function setGauge(pct) {
+        const offset = CIRC - (pct / 100) * CIRC;
+        gaugeFill.style.strokeDashoffset = offset;
+        if (pct < 30) gaugeFill.style.stroke = "#e63946";
+        else if (pct < 60) gaugeFill.style.stroke = "#f4a261";
+        else gaugeFill.style.stroke = "#52b788";
+      }
+
       function simpanLog(persen, adc, ip, kondisi) {
         const now = Date.now();
         if (now - lastLogTime < LOG_INTERVAL_MS) return;
         lastLogTime = now;
-
-        db.ref("/logs").push({
+        db.ref(`/kebun/${kebunId}/logs`).push({
           timestamp: now,
           waktu: new Date(now).toLocaleString("id-ID"),
           kesuburan: persen,
@@ -226,72 +335,70 @@
         });
       }
 
-      let ipTerakhir = "-";
+      function initMonitor() {
+        // Ambang batas
+        db.ref(`/kebun/${kebunId}/config/ambangBatas`).on("value", snap => {
+          const cfg = snap.val();
+          if (cfg) {
+            if (cfg.kering !== undefined) ambangKering = Number(cfg.kering);
+            if (cfg.basah !== undefined) ambangBasah = Number(cfg.basah);
+          }
+        });
 
-      // Listener data sensor
-      db.ref("/sensor").on("value", (snapshot) => {
-        const data = snapshot.val();
+        // Sensor data
+        db.ref(`/kebun/${kebunId}/sensor`).on("value", snap => {
+          const data = snap.val();
+          if (!data) {
+            document.getElementById("lastUpdate").innerHTML =
+              `<span class="iconify" data-icon="mdi:clock-outline" data-width="13"></span> Node sensor kosong`;
+            return;
+          }
+          const persen = Number(data.kesuburan) || 0;
+          const adc = data.adc !== undefined ? data.adc : "-";
 
-        console.log("Data Sensor dari Firebase:", data);
+          document.getElementById("persenValue").textContent = persen + "%";
+          document.getElementById("adcValue").textContent = adc;
+          setGauge(persen);
 
-        if (!data) {
-          document.getElementById("lastUpdate").textContent =
-            "Node /sensor kosong di Firebase";
-          return;
-        }
+          let kondisiTanah, icon, kelas;
+          if (adc !== "-" && adc < ambangKering) {
+            kondisiTanah = "Sangat Kering (Gersang)"; icon = "mdi:thermometer-high"; kelas = "warning";
+          } else if (adc !== "-" && adc > ambangBasah) {
+            kondisiTanah = "Terlalu Basah / Jenuh Air"; icon = "mdi:water-alert"; kelas = "basah";
+          } else {
+            kondisiTanah = "Lembap (Sangat Ideal)"; icon = "mdi:leaf"; kelas = "";
+          }
 
-        const persen = Number(data.kesuburan) || 0;
-        const adc = data.adc !== undefined ? data.adc : "-";
+          const badge = document.getElementById("kondisiBadge");
+          badge.className = "kondisi-badge " + kelas;
+          badge.innerHTML = `<span class="iconify" data-icon="${icon}" data-width="16"></span><span>${kondisiTanah}</span>`;
 
-        document
-          .getElementById("gauge")
-          .style.setProperty("--persen", persen + "%");
-        document.getElementById("persenValue").textContent = persen + "%";
-        document.getElementById("adcValue").textContent = adc;
+          const now = new Date();
+          document.getElementById("lastUpdate").innerHTML =
+            `<span class="iconify" data-icon="mdi:clock-outline" data-width="13"></span> Update: ${now.toLocaleTimeString("id-ID")}`;
 
-        // Menentukan kondisi tanah berdasarkan nilai ADC
-        let kondisiTanah = "Normal";
-        if (adc < 1000) {
-          kondisiTanah = "Sangat Kering (Gersang)";
-        } else if (adc >= 1000 && adc <= 2500) {
-          kondisiTanah = "Lembap (Sangat Ideal)";
-        } else {
-          kondisiTanah = "Terlalu Basah / Jenuh Air";
-        }
-        document.getElementById("statusTanahText").textContent = kondisiTanah;
+          simpanLog(persen, adc, ipTerakhir, kondisiTanah);
+        });
 
-        const now = new Date();
-        document.getElementById("lastUpdate").textContent =
-          "Update terakhir: " + now.toLocaleTimeString("id-ID");
-
-        // Catat ke log secara berkala
-        simpanLog(persen, adc, ipTerakhir, kondisiTanah);
-      });
-
-      // Listener status koneksi wifi ESP32
-      db.ref("/status").on("value", (snapshot) => {
-        const status = snapshot.val();
-        console.log("Data Status dari Firebase:", status);
-
-        const wifiStatus = document.getElementById("wifiStatus");
-        const wifiText = document.getElementById("wifiText");
-        const ipValue = document.getElementById("ipValue");
-
-        if (
-          status &&
-          (status.wifi_connected === true || status.wifi_connected === "true")
-        ) {
-          wifiStatus.className = "status online";
-          wifiText.textContent = "ESP32 Terhubung";
-          ipValue.textContent = status.ip_address || "-";
-          ipTerakhir = status.ip_address || "-";
-        } else {
-          wifiStatus.className = "status offline";
-          wifiText.textContent = "ESP32 Offline";
-          ipValue.textContent = "-";
-          ipTerakhir = "-";
-        }
-      });
+        // Status WiFi
+        db.ref(`/kebun/${kebunId}/status`).on("value", snap => {
+          const status = snap.val();
+          const badge = document.getElementById("wifiStatus");
+          const text = document.getElementById("wifiText");
+          const ip = document.getElementById("ipValue");
+          if (status && (status.wifi_connected === true || status.wifi_connected === "true")) {
+            badge.className = "header-badge online";
+            text.textContent = "Online";
+            ip.textContent = status.ip_address || "—";
+            ipTerakhir = status.ip_address || "-";
+          } else {
+            badge.className = "header-badge offline";
+            text.textContent = "Offline";
+            ip.textContent = "—";
+            ipTerakhir = "-";
+          }
+        });
+      }
     </script>
   </body>
 </html>

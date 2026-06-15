@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Monitoring Kesuburan Tanah</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+    <style>
+      :root {
+        --green-dark: #1b3a2d;
+        --green-mid: #2d6a4f;
+        --green-light: #52b788;
+        --green-pale: #d8f3dc;
+        --accent: #40916c;
+        --danger: #e63946;
+        --danger-bg: #fff0f1;
+        --warn: #f4a261;
+        --warn-bg: #fff7ed;
+        --blue: #2980b9;
+        --blue-bg: #e8f4fc;
+        --text: #1a2e25;
+        --text-muted: #7a9e8e;
+        --bg: #f0f7f2;
+        --card: #ffffff;
+        --radius: 20px;
+        --bottom-nav-h: 70px;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        min-height: 100vh;
+        padding-bottom: calc(var(--bottom-nav-h) + 16px);
+        color: var(--text);
+      }
+
+      .app-header {
+        background: var(--green-dark);
+        padding: 20px 20px 36px;
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+      }
+      .app-header::after {
+        content: "";
+        position: absolute;
+        bottom: -30px; left: -10%; right: -10%;
+        height: 60px;
+        background: var(--bg);
+        border-radius: 50%;
+      }
+      .header-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 4px;
+      }
+      .header-top h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.3px; opacity: 0.95; }
+      .header-sub { font-size: 0.78rem; opacity: 0.6; margin-top: 2px; }
+
+      .content {
+        padding: 28px 16px 0;
+        max-width: 480px;
+        margin: 0 auto;
+      }
+
+      /* Section label */
+      .section-label {
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+        color: var(--text-muted);
+        margin: 0 0 10px 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* Alat aktif banner */
+      .alat-banner {
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        box-shadow: 0 2px 12px rgba(27,58,45,0.08);
+        margin-bottom: 18px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .alat-icon {
+        width: 42px; height: 42px;
+        border-radius: 12px;
+        background: var(--green-pale);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--accent);
+        flex-shrink: 0;
+      }
+      .alat-info { flex: 1; min-width: 0; }
+      .alat-info .ai-lbl { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+      .alat-info .ai-val { font-size: 0.9rem; font-weight: 800; color: var(--text); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .wifi-badge {
+        display: flex; align-items: center; gap: 5px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 0.73rem;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      .wifi-badge.online { background: rgba(82,183,136,0.15); color: var(--accent); }
+      .wifi-badge.offline { background: rgba(230,57,70,0.12); color: var(--danger); }
+      .wifi-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+      .wifi-badge.online .wifi-dot { animation: pulse 2s infinite; }
+      @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+
+      /* Kebun list */
+      .kebun-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+
+      .kebun-card {
+        background: var(--card);
+        border-radius: 16px;
+        box-shadow: 0 2px 12px rgba(27,58,45,0.07);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        border: 2px solid transparent;
+        position: relative;
+        overflow: hidden;
+      }
+      .kebun-card:active { transform: scale(0.98); }
+      .kebun-card:hover { box-shadow: 0 4px 20px rgba(27,58,45,0.13); border-color: var(--green-pale); }
+      .kebun-card.aktif { border-color: var(--accent); }
+      .kebun-card.aktif::before {
+        content: "AKTIF";
+        position: absolute;
+        top: 0; right: 0;
+        background: var(--accent);
+        color: #fff;
+        font-size: 0.6rem;
+        font-weight: 800;
+        padding: 3px 9px;
+        border-bottom-left-radius: 10px;
+        letter-spacing: 0.5px;
+      }
+
+      .kebun-emoji {
+        width: 44px; height: 44px;
+        border-radius: 12px;
+        background: var(--green-pale);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.4rem;
+        flex-shrink: 0;
+      }
+      .kebun-info { flex: 1; min-width: 0; }
+      .kebun-name { font-size: 0.95rem; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .kebun-meta { font-size: 0.73rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .kebun-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: 0.73rem; font-weight: 700;
+        padding: 2px 8px; border-radius: 999px;
+      }
+      .kebun-badge.ok { background: rgba(64,145,108,0.12); color: var(--accent); }
+      .kebun-badge.warn { background: var(--danger-bg); color: var(--danger); }
+      .kebun-badge.basah { background: var(--blue-bg); color: var(--blue); }
+      .kebun-badge.none { background: #f0f0f0; color: #aaa; }
+
+      .kebun-pct { font-size: 1.3rem; font-weight: 800; color: var(--accent); flex-shrink: 0; }
+      .kebun-pct.warn { color: var(--danger); }
+      .kebun-pct.basah { color: var(--blue); }
+
+      .kebun-actions {
+        display: flex; flex-direction: column; gap: 6px; align-items: center; flex-shrink: 0;
+      }
+      .btn-icon {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.8rem;
+        transition: opacity 0.2s, transform 0.1s;
+      }
+      .btn-icon:active { transform: scale(0.92); }
+      .btn-icon.del { background: var(--danger-bg); color: var(--danger); }
+      .btn-icon.del:hover { opacity: 0.8; }
+
+      /* Tambah kebun */
+      .btn-tambah {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        width: 100%;
+        padding: 13px;
+        background: var(--green-pale);
+        color: var(--accent);
+        border: 2px dashed var(--green-light);
+        border-radius: 16px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.2s, transform 0.1s;
+        margin-bottom: 14px;
+      }
+      .btn-tambah:hover { background: #c7ead0; }
+      .btn-tambah:active { transform: scale(0.98); }
+
+      /* Modal */
+      .modal-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.45);
+        z-index: 300;
+        display: flex; align-items: flex-end;
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+      .modal-overlay.open { opacity: 1; pointer-events: all; }
+      .modal-sheet {
+        background: var(--card);
+        width: 100%;
+        border-radius: 24px 24px 0 0;
+        padding: 20px 20px 36px;
+        transform: translateY(60px);
+        transition: transform 0.28s cubic-bezier(0.34,1.2,0.64,1);
+        max-width: 480px;
+        margin: 0 auto;
+      }
+      .modal-overlay.open .modal-sheet { transform: translateY(0); }
+      .modal-handle {
+        width: 36px; height: 4px;
+        border-radius: 999px;
+        background: #ddd;
+        margin: 0 auto 16px;
+      }
+      .modal-title { font-size: 1rem; font-weight: 800; margin-bottom: 16px; color: var(--text); }
+      .modal-label {
+        font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 0.4px;
+        margin-bottom: 6px; display: block;
+      }
+      .modal-input {
+        width: 100%; padding: 12px 14px;
+        border-radius: 12px;
+        border: 2px solid var(--green-pale);
+        font-size: 0.95rem; font-weight: 600;
+        color: var(--text); background: var(--bg);
+        font-family: inherit; margin-bottom: 14px;
+        transition: border-color 0.2s;
+      }
+      .modal-input:focus { outline: none; border-color: var(--accent); }
+      .emoji-picker {
+        display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
+      }
+      .emoji-opt {
+        width: 40px; height: 40px;
+        border-radius: 10px; border: 2px solid transparent;
+        background: var(--bg);
+        font-size: 1.2rem;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: border-color 0.15s, background 0.15s;
+      }
+      .emoji-opt.selected { border-color: var(--accent); background: var(--green-pale); }
+      .modal-btns { display: flex; gap: 10px; }
+      .btn-modal {
+        flex: 1; padding: 12px;
+        border: none; border-radius: 12px;
+        font-size: 0.9rem; font-weight: 700;
+        cursor: pointer; font-family: inherit;
+        transition: opacity 0.2s, transform 0.1s;
+      }
+      .btn-modal:active { transform: scale(0.97); }
+      .btn-modal.primary { background: var(--green-dark); color: #fff; }
+      .btn-modal.secondary { background: var(--green-pale); color: var(--accent); }
+
+      /* Bottom Navbar */
+      .bottom-nav {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        height: var(--bottom-nav-h);
+        background: var(--card);
+        box-shadow: 0 -2px 20px rgba(27,58,45,0.12);
+        display: flex; align-items: stretch;
+        z-index: 100; padding: 0 8px;
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      .nav-item {
+        flex: 1; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 4px; text-decoration: none;
+        color: var(--text-muted); font-size: 0.68rem; font-weight: 600;
+        border-radius: 12px;
+        transition: color 0.2s ease, background 0.2s ease;
+        padding: 8px 4px; position: relative;
+      }
+      .nav-item .nav-icon { font-size: 1.45rem; line-height: 1; transition: transform 0.2s ease; }
+      .nav-item.active { color: var(--accent); }
+      .nav-item.active .nav-icon { transform: translateY(-2px); }
+      .nav-item.active::before {
+        content: "";
+        position: absolute; top: 6px;
+        width: 32px; height: 3px;
+        background: var(--accent); border-radius: 999px;
+      }
+      .nav-item:not(.active):hover { color: var(--green-mid); background: var(--green-pale); }
+
+      .empty-kebun {
+        text-align: center; padding: 40px 20px;
+        color: var(--text-muted);
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+      }
+      .empty-kebun .e-icon { font-size: 2.8rem; opacity: 0.35; }
+      .empty-kebun p { font-size: 0.88rem; }
+    </style>
+  </head>
+  <body>
+
+    <div class="app-header">
+      <div class="header-top">
+        <h1>🌱 Kesuburan Tanah</h1>
+        <div id="wifiStatus" class="wifi-badge offline">
+          <span class="wifi-dot"></span>
+          <span id="wifiText">Offline</span>
+        </div>
+      </div>
+      <div class="header-sub">Pilih kebun untuk memantau sensor ESP32</div>
+    </div>
+
+    <div class="content">
+
+      <!-- Banner alat aktif -->
+      <div class="alat-banner">
+        <div class="alat-icon">
+          <span class="iconify" data-icon="mdi:chip" data-width="22"></span>
+        </div>
+        <div class="alat-info">
+          <div class="ai-lbl">Alat Aktif Sekarang</div>
+          <div class="ai-val" id="alatKebun">—</div>
+        </div>
+        <div id="alatBadge" class="wifi-badge offline">
+          <span class="wifi-dot"></span>
+          <span id="alatBadgeText">—</span>
+        </div>
+      </div>
+
+      <div class="section-label" style="margin-bottom:10px">
+        <span class="iconify" data-icon="mdi:sprout" data-width="13"></span>
+        Daftar Kebun
+      </div>
+
+      <div class="kebun-grid" id="kebunGrid">
+        <div class="empty-kebun">
+          <span class="e-icon">🌿</span>
+          <p>Belum ada kebun.<br>Tambahkan kebun pertama kamu!</p>
+        </div>
+      </div>
+
+      <button class="btn-tambah" onclick="bukaModal()">
+        <span class="iconify" data-icon="mdi:plus-circle-outline" data-width="20"></span>
+        Tambah Kebun Baru
+      </button>
+
+    </div>
+
+    <!-- Modal tambah kebun -->
+    <div class="modal-overlay" id="modalOverlay" onclick="tutupModalLuar(event)">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Tambah Kebun Baru</div>
+
+        <label class="modal-label">Nama Kebun</label>
+        <input class="modal-input" id="inputNama" type="text" placeholder="contoh: Kebun Belakang A" maxlength="40" />
+
+        <label class="modal-label">Pilih Ikon</label>
+        <div class="emoji-picker" id="emojiPicker"></div>
+
+        <div class="modal-btns">
+          <button class="btn-modal secondary" onclick="tutupModal()">Batal</button>
+          <button class="btn-modal primary" onclick="simpanKebun()">Simpan</button>
+        </div>
+      </div>
+    </div>
+
+    <nav class="bottom-nav">
+      <a href="home.html" class="nav-item active">
+        <span class="nav-icon iconify" data-icon="mdi:home-outline" data-width="24"></span>
+        Beranda
+      </a>
+      <a href="#" class="nav-item" onclick="bukaMonitor(event)">
+        <span class="nav-icon iconify" data-icon="mdi:sprout" data-width="24"></span>
+        Monitor
+      </a>
+      <a href="#" class="nav-item" onclick="bukaLog(event)">
+        <span class="nav-icon iconify" data-icon="mdi:clipboard-text-clock" data-width="24"></span>
+        Log Data
+      </a>
+      <a href="#" class="nav-item" onclick="bukaPengaturan(event)">
+        <span class="nav-icon iconify" data-icon="mdi:tune-variant" data-width="24"></span>
+        Pengaturan
+      </a>
+    </nav>
+
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyDdOxTgyrdXH9xwC7bU7fDMYIoTD3qzxvg",
+        authDomain: "psti-b376f.firebaseapp.com",
+        databaseURL: "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "psti-b376f",
+        storageBucket: "psti-b376f.firebasestorage.app",
+        messagingSenderId: "658575197616",
+        appId: "1:658575197616:web:da2d5e9032eee01465c275",
+      };
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
+
+      // ── Konstanta ──
+      const EMOJIS = ["🌱","🌿","🪴","🌾","🍃","🌳","🌲","🥦","🌻","🌾","🫘","🧅"];
+      let selectedEmoji = EMOJIS[0];
+      let daftarKebun = []; // [{id, nama, emoji}]
+      let sensorSnapshot = {}; // {kebunId: {persen, adc, kondisi}}
+      let kebunAktif = null; // id kebun yang sedang dipasang alat
+
+      // ── Init emoji picker ──
+      const picker = document.getElementById("emojiPicker");
+      EMOJIS.forEach((e, i) => {
+        const div = document.createElement("div");
+        div.className = "emoji-opt" + (i === 0 ? " selected" : "");
+        div.textContent = e;
+        div.onclick = () => {
+          picker.querySelectorAll(".emoji-opt").forEach(x => x.classList.remove("selected"));
+          div.classList.add("selected");
+          selectedEmoji = e;
+        };
+        picker.appendChild(div);
+      });
+
+      // ── Load daftar kebun dari Firebase ──
+      db.ref("/kebun").on("value", snap => {
+        const data = snap.val();
+        daftarKebun = data
+          ? Object.entries(data).map(([id, v]) => ({ id, nama: v.nama || id, emoji: v.emoji || "🌱" }))
+          : [];
+        renderKebun();
+      });
+
+      // ── Status WiFi & alat aktif (dari /status) ──
+      db.ref("/status").on("value", snap => {
+        const s = snap.val();
+        const badge = document.getElementById("wifiStatus");
+        const text = document.getElementById("wifiText");
+        if (s && (s.wifi_connected === true || s.wifi_connected === "true")) {
+          badge.className = "wifi-badge online";
+          text.textContent = "Online";
+        } else {
+          badge.className = "wifi-badge offline";
+          text.textContent = "Offline";
+        }
+      });
+
+      // ── Sensor data per kebun dari /kebun/{id}/sensor ──
+      function listenSensor(id) {
+        db.ref(`/kebun/${id}/sensor`).on("value", snap => {
+          const d = snap.val();
+          if (d) sensorSnapshot[id] = d;
+          else delete sensorSnapshot[id];
+          renderKebun();
+        });
+        db.ref(`/kebun/${id}/status`).on("value", snap => {
+          const s = snap.val();
+          sensorSnapshot[id] = sensorSnapshot[id] || {};
+          sensorSnapshot[id]._online = s && (s.wifi_connected === true || s.wifi_connected === "true");
+          sensorSnapshot[id]._ip = s?.ip_address || "—";
+          // Update alat banner jika kebun ini aktif
+          if (kebunAktif === id) renderAlatBanner(id, s);
+          renderKebun();
+        });
+      }
+
+      function renderAlatBanner(id, status) {
+        const kebun = daftarKebun.find(k => k.id === id);
+        document.getElementById("alatKebun").textContent = kebun ? `${kebun.emoji} ${kebun.nama}` : "—";
+        const badge = document.getElementById("alatBadge");
+        const bText = document.getElementById("alatBadgeText");
+        if (status && (status.wifi_connected === true || status.wifi_connected === "true")) {
+          badge.className = "wifi-badge online";
+          bText.textContent = status.ip_address || "Online";
+        } else {
+          badge.className = "wifi-badge offline";
+          bText.textContent = "Offline";
+        }
+      }
+
+      function getKondisiInfo(snap) {
+        if (!snap) return { label: "Belum ada data", kelas: "none", pctKelas: "" };
+        const adc = snap.adc;
+        const kering = snap.ambangKering || 1000;
+        const basah = snap.ambangBasah || 2500;
+        if (adc !== undefined && adc < kering) return { label: "Sangat Kering", kelas: "warn", pctKelas: "warn" };
+        if (adc !== undefined && adc > basah)  return { label: "Terlalu Basah", kelas: "basah", pctKelas: "basah" };
+        if (adc !== undefined) return { label: "Ideal", kelas: "ok", pctKelas: "" };
+        return { label: "Belum ada data", kelas: "none", pctKelas: "" };
+      }
+
+      function renderKebun() {
+        const grid = document.getElementById("kebunGrid");
+
+        if (daftarKebun.length === 0) {
+          grid.innerHTML = `<div class="empty-kebun">
+            <span class="e-icon">🌿</span>
+            <p>Belum ada kebun.<br>Tambahkan kebun pertama kamu!</p>
+          </div>`;
+          return;
+        }
+
+        // Listen sensor tiap kebun (idempotent karena Firebase dedup)
+        daftarKebun.forEach(k => listenSensor(k.id));
+
+        grid.innerHTML = daftarKebun.map(kebun => {
+          const snap = sensorSnapshot[kebun.id];
+          const kondisi = getKondisiInfo(snap);
+          const persen = snap?.kesuburan ?? "—";
+          const isAktif = kebunAktif === kebun.id;
+          return `<div class="kebun-card ${isAktif ? 'aktif' : ''}" onclick="pilihKebun('${kebun.id}')">
+            <div class="kebun-emoji">${kebun.emoji}</div>
+            <div class="kebun-info">
+              <div class="kebun-name">${kebun.nama}</div>
+              <div class="kebun-meta">
+                <span class="kebun-badge ${kondisi.kelas}">${kondisi.label}</span>
+              </div>
+            </div>
+            <div class="kebun-pct ${kondisi.pctKelas}">${persen !== "—" ? persen + "%" : "—"}</div>
+            <div class="kebun-actions" onclick="event.stopPropagation()">
+              <button class="btn-icon del" onclick="hapusKebun('${kebun.id}', '${kebun.nama}')">
+                <span class="iconify" data-icon="mdi:delete-outline" data-width="16"></span>
+              </button>
+            </div>
+          </div>`;
+        }).join("");
+
+        if (window.Iconify) Iconify.scan();
+      }
+
+      function pilihKebun(id) {
+        sessionStorage.setItem("kebunId", id);
+        const kebun = daftarKebun.find(k => k.id === id);
+        if (kebun) sessionStorage.setItem("kebunNama", kebun.nama);
+        window.location.href = "index.html";
+      }
+
+      function bukaMonitor(e) {
+        e.preventDefault();
+        const id = sessionStorage.getItem("kebunId");
+        if (!id) { alert("Pilih kebun terlebih dahulu dari daftar kebun."); return; }
+        window.location.href = "index.html";
+      }
+      function bukaLog(e) {
+        e.preventDefault();
+        const id = sessionStorage.getItem("kebunId");
+        if (!id) { alert("Pilih kebun terlebih dahulu dari daftar kebun."); return; }
+        window.location.href = "log.html";
+      }
+      function bukaPengaturan(e) {
+        e.preventDefault();
+        const id = sessionStorage.getItem("kebunId");
+        if (!id) { alert("Pilih kebun terlebih dahulu dari daftar kebun."); return; }
+        window.location.href = "pengaturan.html";
+      }
+
+      // ── Kebun aktif dari sessionStorage ──
+      window.addEventListener("DOMContentLoaded", () => {
+        kebunAktif = sessionStorage.getItem("kebunId");
+      });
+
+      // ── Modal ──
+      function bukaModal() {
+        document.getElementById("inputNama").value = "";
+        picker.querySelectorAll(".emoji-opt").forEach((x, i) => x.classList.toggle("selected", i === 0));
+        selectedEmoji = EMOJIS[0];
+        document.getElementById("modalOverlay").classList.add("open");
+        setTimeout(() => document.getElementById("inputNama").focus(), 300);
+      }
+      function tutupModal() {
+        document.getElementById("modalOverlay").classList.remove("open");
+      }
+      function tutupModalLuar(e) {
+        if (e.target === document.getElementById("modalOverlay")) tutupModal();
+      }
+
+      function simpanKebun() {
+        const nama = document.getElementById("inputNama").value.trim();
+        if (!nama) { document.getElementById("inputNama").focus(); return; }
+        const id = "kebun_" + Date.now();
+        db.ref(`/kebun/${id}`).set({ nama, emoji: selectedEmoji }).then(() => {
+          tutupModal();
+        });
+      }
+
+      function hapusKebun(id, nama) {
+        if (!confirm(`Hapus kebun "${nama}"? Semua data log kebun ini akan terhapus.`)) return;
+        db.ref(`/kebun/${id}`).remove();
+        if (sessionStorage.getItem("kebunId") === id) {
+          sessionStorage.removeItem("kebunId");
+          sessionStorage.removeItem("kebunNama");
+          kebunAktif = null;
+          document.getElementById("alatKebun").textContent = "—";
+          document.getElementById("alatBadge").className = "wifi-badge offline";
+          document.getElementById("alatBadgeText").textContent = "—";
+        }
+      }
+    </script>
+  </body>
+</html>
