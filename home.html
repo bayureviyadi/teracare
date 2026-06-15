@@ -423,6 +423,7 @@
       let daftarKebun = []; // [{id, nama, emoji}]
       let sensorSnapshot = {}; // {kebunId: {persen, adc, kondisi}}
       let kebunAktif = null; // id kebun yang sedang dipasang alat
+      const listenedKebunIds = new Set();
 
       // ── Init emoji picker ──
       const picker = document.getElementById("emojiPicker");
@@ -447,26 +448,24 @@
         renderKebun();
       });
 
-      // ── Status WiFi & alat aktif (dari /status) ──
-      db.ref("/status").on("value", snap => {
-        const s = snap.val();
-        const badge = document.getElementById("wifiStatus");
-        const text = document.getElementById("wifiText");
-        if (s && (s.wifi_connected === true || s.wifi_connected === "true")) {
-          badge.className = "wifi-badge online";
-          text.textContent = "Online";
-        } else {
-          badge.className = "wifi-badge offline";
-          text.textContent = "Offline";
-        }
-      });
+      // ── Status WiFi ditangani per-kebun via /kebun/{id}/status ──
+      // (listener global /status dihapus — sudah tidak dipakai)
 
       // ── Sensor data per kebun dari /kebun/{id}/sensor ──
       function listenSensor(id) {
+        if (listenedKebunIds.has(id)) return;
+        listenedKebunIds.add(id);
+
         db.ref(`/kebun/${id}/sensor`).on("value", snap => {
           const d = snap.val();
-          if (d) sensorSnapshot[id] = d;
-          else delete sensorSnapshot[id];
+          sensorSnapshot[id] = sensorSnapshot[id] || {};
+          if (d) {
+            Object.assign(sensorSnapshot[id], d);
+          } else {
+            delete sensorSnapshot[id].kesuburan;
+            delete sensorSnapshot[id].adc;
+            delete sensorSnapshot[id].kondisi;
+          }
           renderKebun();
         });
         db.ref(`/kebun/${id}/status`).on("value", snap => {
@@ -478,6 +477,14 @@
           if (kebunAktif === id) renderAlatBanner(id, s);
           renderKebun();
         });
+      }
+
+      function stopListenSensor(id) {
+        if (!listenedKebunIds.has(id)) return;
+        listenedKebunIds.delete(id);
+        db.ref(`/kebun/${id}/sensor`).off("value");
+        db.ref(`/kebun/${id}/status`).off("value");
+        delete sensorSnapshot[id];
       }
 
       function renderAlatBanner(id, status) {
@@ -516,7 +523,15 @@
           return;
         }
 
-        // Listen sensor tiap kebun (idempotent karena Firebase dedup)
+        // Hentikan listener untuk kebun yang sudah dihapus
+        const currentIds = new Set(daftarKebun.map(k => k.id));
+        listenedKebunIds.forEach(id => {
+          if (!currentIds.has(id)) {
+            stopListenSensor(id);
+          }
+        });
+
+        // Listen sensor tiap kebun jika belum didengarkan
         daftarKebun.forEach(k => listenSensor(k.id));
 
         grid.innerHTML = daftarKebun.map(kebun => {
@@ -594,7 +609,8 @@
         const nama = document.getElementById("inputNama").value.trim();
         if (!nama) { document.getElementById("inputNama").focus(); return; }
         const id = "kebun_" + Date.now();
-        db.ref(`/kebun/${id}`).set({ nama, emoji: selectedEmoji }).then(() => {
+        // Gunakan update per field, bukan set() — agar logs/config/sensor tidak ikut terhapus
+        db.ref(`/kebun/${id}`).update({ nama, emoji: selectedEmoji }).then(() => {
           tutupModal();
         });
       }
