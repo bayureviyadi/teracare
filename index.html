@@ -35,34 +35,6 @@
         font-size: 1.5rem;
         margin-bottom: 20px;
       }
-
-      /* Navigasi Tab */
-      .nav {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-        background: #f4f9f8;
-        border-radius: 12px;
-        padding: 6px;
-      }
-      .nav a {
-        flex: 1;
-        text-decoration: none;
-        padding: 10px;
-        border-radius: 10px;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #1f4037;
-        transition: background 0.2s ease, color 0.2s ease;
-      }
-      .nav a.active {
-        background: #1f4037;
-        color: #fff;
-      }
-      .nav a:not(.active):hover {
-        background: #e2efe9;
-      }
-
       .status {
         display: inline-flex;
         align-items: center;
@@ -143,26 +115,53 @@
         margin-top: 15px;
         font-size: 0.8rem;
         color: #95a5a6;
+        margin-bottom: 15px;
       }
-      .status-tanah {
+      
+      /* --- STYLE BARU UNTUK BLUETOOTH CONFIG --- */
+      .btn-ble {
+        background: #2980b9;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 10px;
+        transition: background 0.2s;
+      }
+      .btn-ble:hover { background: #2471a3; }
+      .ble-panel {
+        display: none;
         margin-top: 15px;
-        padding: 10px;
+        padding: 15px;
+        border: 1px dashed #2980b9;
         border-radius: 10px;
-        background: #f4f9f8;
-        color: #1f4037;
-        font-weight: 600;
-        font-size: 0.95rem;
+        background: #f2f7fa;
+      }
+      .ble-input {
+        width: 100%;
+        padding: 8px;
+        margin: 5px 0 10px 0;
+        border: 1px solid #bdc3c7;
+        border-radius: 5px;
+      }
+      .btn-send {
+        background: #27ae60;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 5px;
+        cursor: pointer;
+        width: 100%;
+        font-weight: bold;
       }
     </style>
   </head>
   <body>
     <div class="card">
       <h1>🌱 Monitoring Kesuburan Tanah</h1>
-
-      <nav class="nav">
-        <a href="index.html" class="active">Monitoring</a>
-        <a href="log.html">Log Data</a>
-      </nav>
 
       <div id="wifiStatus" class="status offline">
         <span class="dot"></span>
@@ -185,9 +184,15 @@
         </div>
       </div>
 
-      <div class="status-tanah" id="statusTanahText">-</div>
-
       <div class="updated" id="lastUpdate">Belum ada data</div>
+
+      <button class="btn-ble" id="btnConnectBLE">⚙️ Pengaturan Wi-Fi via Bluetooth</button>
+      
+      <div class="ble-panel" id="blePanel">
+        <input type="text" id="ssidInput" class="ble-input" placeholder="Nama Wi-Fi (SSID)">
+        <input type="password" id="passInput" class="ble-input" placeholder="Password Wi-Fi">
+        <button class="btn-send" id="btnSendWiFi">Kirim & Sambungkan</button>
+      </div>
     </div>
 
     <script>
@@ -195,8 +200,7 @@
       const firebaseConfig = {
         apiKey: "AIzaSyDdOxTgyrdXH9xwC7bU7fDMYIoTD3qzxvg",
         authDomain: "psti-b376f.firebaseapp.com",
-        databaseURL:
-          "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app",
+        databaseURL: "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app",
         projectId: "psti-b376f",
         storageBucket: "psti-b376f.firebasestorage.app",
         messagingSenderId: "658575197616",
@@ -206,90 +210,80 @@
       firebase.initializeApp(firebaseConfig);
       const db = firebase.database();
 
-      // Interval minimum antar pencatatan log (ms) agar database tidak penuh
-      const LOG_INTERVAL_MS = 5 * 60 * 1000; // 5 menit
-      let lastLogTime = 0;
-
-      // Simpan satu entri log ke /logs
-      function simpanLog(persen, adc, ip, kondisi) {
-        const now = Date.now();
-        if (now - lastLogTime < LOG_INTERVAL_MS) return;
-        lastLogTime = now;
-
-        db.ref("/logs").push({
-          timestamp: now,
-          waktu: new Date(now).toLocaleString("id-ID"),
-          kesuburan: persen,
-          adc: adc,
-          ip: ip || "-",
-          kondisi: kondisi || "-",
-        });
-      }
-
-      let ipTerakhir = "-";
-
-      // Listener data sensor
+      // Listener data sensor dari Firebase
       db.ref("/sensor").on("value", (snapshot) => {
         const data = snapshot.val();
-
-        console.log("Data Sensor dari Firebase:", data);
-
-        if (!data) {
-          document.getElementById("lastUpdate").textContent =
-            "Node /sensor kosong di Firebase";
-          return;
-        }
-
+        if (!data) return;
         const persen = Number(data.kesuburan) || 0;
-        const adc = data.adc !== undefined ? data.adc : "-";
-
-        document
-          .getElementById("gauge")
-          .style.setProperty("--persen", persen + "%");
+        document.getElementById("gauge").style.setProperty("--persen", persen + "%");
         document.getElementById("persenValue").textContent = persen + "%";
-        document.getElementById("adcValue").textContent = adc;
-
-        // Menentukan kondisi tanah berdasarkan nilai ADC
-        let kondisiTanah = "Normal";
-        if (adc < 1000) {
-          kondisiTanah = "Sangat Kering (Gersang)";
-        } else if (adc >= 1000 && adc <= 2500) {
-          kondisiTanah = "Lembap (Sangat Ideal)";
-        } else {
-          kondisiTanah = "Terlalu Basah / Jenuh Air";
-        }
-        document.getElementById("statusTanahText").textContent = kondisiTanah;
-
+        document.getElementById("adcValue").textContent = data.adc !== undefined ? data.adc : "-";
         const now = new Date();
-        document.getElementById("lastUpdate").textContent =
-          "Update terakhir: " + now.toLocaleTimeString("id-ID");
-
-        // Catat ke log secara berkala
-        simpanLog(persen, adc, ipTerakhir, kondisiTanah);
+        document.getElementById("lastUpdate").textContent = "Update terakhir: " + now.toLocaleTimeString("id-ID");
       });
 
       // Listener status koneksi wifi ESP32
       db.ref("/status").on("value", (snapshot) => {
         const status = snapshot.val();
-        console.log("Data Status dari Firebase:", status);
-
         const wifiStatus = document.getElementById("wifiStatus");
         const wifiText = document.getElementById("wifiText");
         const ipValue = document.getElementById("ipValue");
 
-        if (
-          status &&
-          (status.wifi_connected === true || status.wifi_connected === "true")
-        ) {
+        if (status && (status.wifi_connected === true || status.wifi_connected === "true")) {
           wifiStatus.className = "status online";
           wifiText.textContent = "ESP32 Terhubung";
           ipValue.textContent = status.ip_address || "-";
-          ipTerakhir = status.ip_address || "-";
         } else {
           wifiStatus.className = "status offline";
           wifiText.textContent = "ESP32 Offline";
           ipValue.textContent = "-";
-          ipTerakhir = "-";
+        }
+      });
+
+      // --- LOGIKA WEB BLUETOOTH API ---
+      let bleCharacteristic;
+      const UUID_SERVICE = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+      const UUID_CHARACTERISTIC = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+      document.getElementById("btnConnectBLE").addEventListener("click", async () => {
+        try {
+          console.log("Mencari Perangkat Bluetooth...");
+          const device = await navigator.bluetooth.requestDevice({
+            filters: [{ name: "ESP32_SmartFarming" }],
+            optionalServices: [UUID_SERVICE]
+          });
+
+          const server = await device.gatt.connect();
+          const service = await server.getPrimaryService(UUID_SERVICE);
+          bleCharacteristic = await service.getCharacteristic(UUID_CHARACTERISTIC);
+          
+          alert("Bluetooth Terhubung Berhasil!");
+          document.getElementById("blePanel").style.display = "block";
+        } catch (error) {
+          console.error("Gagal koneksi BLE:", error);
+          alert("Gagal terhubung Bluetooth. Pastikan Bluetooth HP aktif.");
+        }
+      });
+
+      document.getElementById("btnSendWiFi").addEventListener("click", async () => {
+        const ssid = document.getElementById("ssidInput").value;
+        const pass = document.getElementById("passInput").value;
+
+        if (!ssid) { alert("Nama Wi-Fi tidak boleh kosong!"); return; }
+
+        // Format data yang dikirim ke ESP32: "namaWiFi;passwordWiFi"
+        const dataPaket = ssid + ";" + pass; 
+        const encoder = new TextEncoder();
+        const dataBuffer = encoder.encode(dataPaket);
+
+        try {
+          if (bleCharacteristic) {
+            await bleCharacteristic.writeValue(dataBuffer);
+            alert("Data Wi-Fi berhasil dikirim! Menunggu ESP32 menyambung internet...");
+            document.getElementById("blePanel").style.display = "none";
+          }
+        } catch (error) {
+          alert("Gagal mengirim data via Bluetooth.");
         }
       });
     </script>
