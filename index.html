@@ -3,9 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Monitoring Kesuburan Tanah</title>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <title>Demo Monitoring Kesuburan Tanah (Bluetooth Murni)</title>
     <style>
       * {
         box-sizing: border-box;
@@ -117,60 +115,36 @@
         color: #95a5a6;
         margin-bottom: 15px;
       }
-      
-      /* --- STYLE BARU UNTUK BLUETOOTH CONFIG --- */
-      .btn-ble {
-        background: #2980b9;
+      .btn-connect {
+        background: #27ae60;
         color: white;
         border: none;
-        padding: 10px 15px;
+        padding: 12px 15px;
         border-radius: 8px;
         font-weight: bold;
         cursor: pointer;
         width: 100%;
-        margin-top: 10px;
-        transition: background 0.2s;
+        font-size: 1rem;
+        box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3);
+        transition: all 0.2s;
       }
-      .btn-ble:hover { background: #2471a3; }
-      .ble-panel {
-        display: none;
-        margin-top: 15px;
-        padding: 15px;
-        border: 1px dashed #2980b9;
-        border-radius: 10px;
-        background: #f2f7fa;
-      }
-      .ble-input {
-        width: 100%;
-        padding: 8px;
-        margin: 5px 0 10px 0;
-        border: 1px solid #bdc3c7;
-        border-radius: 5px;
-      }
-      .btn-send {
-        background: #27ae60;
-        color: white;
-        border: none;
-        padding: 8px 12px;
-        border-radius: 5px;
-        cursor: pointer;
-        width: 100%;
-        font-weight: bold;
+      .btn-connect:active {
+        transform: scale(0.98);
       }
     </style>
   </head>
   <body>
     <div class="card">
-      <h1>🌱 Monitoring Kesuburan Tanah</h1>
+      <h1>🌱 Smart Farming Direct</h1>
 
-      <div id="wifiStatus" class="status offline">
+      <div id="bleStatus" class="status offline">
         <span class="dot"></span>
-        <span id="wifiText">Memeriksa koneksi...</span>
+        <span id="statusText">Alat Belum Terhubung</span>
       </div>
 
       <div class="gauge" id="gauge" style="--persen: 0%">
         <div class="gauge-value" id="persenValue">0%</div>
-        <div class="gauge-label">Estimasi Kesuburan</div>
+        <div class="gauge-label">Kelembaban/Kesuburan</div>
       </div>
 
       <div class="info">
@@ -179,111 +153,89 @@
           <span id="adcValue">-</span>
         </div>
         <div>
-          IP ESP32
-          <span id="ipValue">-</span>
+          Koneksi
+          <span id="modeValue">Bluetooth BLE</span>
         </div>
       </div>
 
-      <div class="updated" id="lastUpdate">Belum ada data</div>
+      <div class="updated" id="lastUpdate">Silakan klik tombol di bawah</div>
 
-      <button class="btn-ble" id="btnConnectBLE">⚙️ Pengaturan Wi-Fi via Bluetooth</button>
-      
-      <div class="ble-panel" id="blePanel">
-        <input type="text" id="ssidInput" class="ble-input" placeholder="Nama Wi-Fi (SSID)">
-        <input type="password" id="passInput" class="ble-input" placeholder="Password Wi-Fi">
-        <button class="btn-send" id="btnSendWiFi">Kirim & Sambungkan</button>
-      </div>
+      <button class="btn-connect" id="btnConnect">🔌 HUBUNGKAN ALAT</button>
     </div>
 
     <script>
-      // Konfigurasi Firebase
-      const firebaseConfig = {
-        apiKey: "AIzaSyDdOxTgyrdXH9xwC7bU7fDMYIoTD3qzxvg",
-        authDomain: "psti-b376f.firebaseapp.com",
-        databaseURL: "https://psti-b376f-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "psti-b376f",
-        storageBucket: "psti-b376f.firebasestorage.app",
-        messagingSenderId: "658575197616",
-        appId: "1:658575197616:web:da2d5e9032eee01465c275",
-      };
-
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.database();
-
-      // Listener data sensor dari Firebase
-      db.ref("/sensor").on("value", (snapshot) => {
-        const data = snapshot.val();
-        if (!data) return;
-        const persen = Number(data.kesuburan) || 0;
-        document.getElementById("gauge").style.setProperty("--persen", persen + "%");
-        document.getElementById("persenValue").textContent = persen + "%";
-        document.getElementById("adcValue").textContent = data.adc !== undefined ? data.adc : "-";
-        const now = new Date();
-        document.getElementById("lastUpdate").textContent = "Update terakhir: " + now.toLocaleTimeString("id-ID");
-      });
-
-      // Listener status koneksi wifi ESP32
-      db.ref("/status").on("value", (snapshot) => {
-        const status = snapshot.val();
-        const wifiStatus = document.getElementById("wifiStatus");
-        const wifiText = document.getElementById("wifiText");
-        const ipValue = document.getElementById("ipValue");
-
-        if (status && (status.wifi_connected === true || status.wifi_connected === "true")) {
-          wifiStatus.className = "status online";
-          wifiText.textContent = "ESP32 Terhubung";
-          ipValue.textContent = status.ip_address || "-";
-        } else {
-          wifiStatus.className = "status offline";
-          wifiText.textContent = "ESP32 Offline";
-          ipValue.textContent = "-";
-        }
-      });
-
-      // --- LOGIKA WEB BLUETOOTH API ---
-      let bleCharacteristic;
       const UUID_SERVICE = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
       const UUID_CHARACTERISTIC = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-      document.getElementById("btnConnectBLE").addEventListener("click", async () => {
+      const btnConnect = document.getElementById("btnConnect");
+      const bleStatus = document.getElementById("bleStatus");
+      const statusText = document.getElementById("statusText");
+      const persenValue = document.getElementById("persenValue");
+      const adcValue = document.getElementById("adcValue");
+      const gauge = document.getElementById("gauge");
+      const lastUpdate = document.getElementById("lastUpdate");
+
+      btnConnect.addEventListener("click", async () => {
         try {
-          console.log("Mencari Perangkat Bluetooth...");
+          statusText.textContent = "Mencari alat...";
+          
+          // 1. Request bluetooth dengan nama spesifik ESP32 kita
           const device = await navigator.bluetooth.requestDevice({
             filters: [{ name: "ESP32_SmartFarming" }],
             optionalServices: [UUID_SERVICE]
           });
 
+          // 2. Hubungkan ke GATT Server alat
           const server = await device.gatt.connect();
-          const service = await server.getPrimaryService(UUID_SERVICE);
-          bleCharacteristic = await service.getCharacteristic(UUID_CHARACTERISTIC);
           
-          alert("Bluetooth Terhubung Berhasil!");
-          document.getElementById("blePanel").style.display = "block";
+          // 3. Ambil Service dan Karakteristik data
+          const service = await server.getPrimaryService(UUID_SERVICE);
+          const characteristic = await service.getCharacteristic(UUID_CHARACTERISTIC);
+          
+          // 4. Aktifkan listener (Menerima kiriman berkala secara otomatis dari ESP32)
+          await characteristic.startNotifications();
+          
+          // Mengubah UI menjadi Online/Terhubung
+          bleStatus.className = "status online";
+          statusText.textContent = "Alat Terhubung";
+          btnConnect.style.display = "none"; // Sembunyikan tombol jika sudah konek
+          lastUpdate.textContent = "Menerima data secara real-time...";
+
+          characteristic.addEventListener("characteristicvaluechanged", (event) => {
+            // Membaca kiriman paket data string dari ESP32
+            const decoder = new TextDecoder("utf-8");
+            const dataMentah = decoder.decode(event.target.value);
+            
+            // Memecah kembali data "nilaiADC,persentase"
+            const partData = dataMentah.split(",");
+            const rawADC = partData[0];
+            const persen = Number(partData[1]) || 0;
+
+            // Tampilkan ke komponen UI Website
+            gauge.style.setProperty("--persen", persen + "%");
+            persenValue.textContent = persen + "%";
+            adcValue.textContent = rawADC;
+            
+            const now = new Date();
+            lastUpdate.textContent = "Update: " + now.toLocaleTimeString("id-ID") + " WIB";
+          });
+
+          // Listener jika koneksi Bluetooth terputus di tengah jalan
+          device.addEventListener('gattserverdisconnected', () => {
+            bleStatus.className = "status offline";
+            statusText.textContent = "Alat Terputus";
+            btnConnect.style.display = "block";
+            adcValue.textContent = "-";
+            gauge.style.setProperty("--persen", "0%");
+            persenValue.textContent = "0%";
+            lastUpdate.textContent = "Koneksi terputus. Silakan hubungkan ulang.";
+          });
+
         } catch (error) {
-          console.error("Gagal koneksi BLE:", error);
-          alert("Gagal terhubung Bluetooth. Pastikan Bluetooth HP aktif.");
-        }
-      });
-
-      document.getElementById("btnSendWiFi").addEventListener("click", async () => {
-        const ssid = document.getElementById("ssidInput").value;
-        const pass = document.getElementById("passInput").value;
-
-        if (!ssid) { alert("Nama Wi-Fi tidak boleh kosong!"); return; }
-
-        // Format data yang dikirim ke ESP32: "namaWiFi;passwordWiFi"
-        const dataPaket = ssid + ";" + pass; 
-        const encoder = new TextEncoder();
-        const dataBuffer = encoder.encode(dataPaket);
-
-        try {
-          if (bleCharacteristic) {
-            await bleCharacteristic.writeValue(dataBuffer);
-            alert("Data Wi-Fi berhasil dikirim! Menunggu ESP32 menyambung internet...");
-            document.getElementById("blePanel").style.display = "none";
-          }
-        } catch (error) {
-          alert("Gagal mengirim data via Bluetooth.");
+          console.error(error);
+          bleStatus.className = "status offline";
+          statusText.textContent = "Alat Belum Terhubung";
+          alert("Koneksi dibatalkan atau Bluetooth error.");
         }
       });
     </script>
